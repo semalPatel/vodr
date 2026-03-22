@@ -1,0 +1,18 @@
+%PDF-1.4
+1 0 obj
+<< /Length 999 >>
+stream
+BT
+/F1 24 Tf
+72 720 Td
+(Chapter 1: Getting Started) Tj
+0 -30 Td
+(This is the first PDF chapter.) Tj
+0 -30 Td
+(Chapter 2: Deep Dive) Tj
+0 -30 Td
+(More PDF details follow.) Tj
+ET
+endstream
+endobj
+%%EOF
