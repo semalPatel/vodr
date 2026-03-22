@@ -1,1 +1,1 @@
-// Root build script for the bootstrap skeleton.
+// Root build script intentionally left minimal.
