@@ -48,6 +48,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("com.google.dagger:hilt-android:2.57.1")
+    implementation(project(":feature-library"))
 
     kapt("com.google.dagger:hilt-android-compiler:2.57.1")
 
