@@ -1,0 +1,16 @@
+package com.vodr.data.db.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.vodr.data.db.entity.ChunkEntity
+
+@Dao
+interface ChunkDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(chunk: ChunkEntity): Long
+
+    @Query("SELECT * FROM chunks WHERE chunkId = :chunkId")
+    fun getById(chunkId: Long): ChunkEntity?
+}
