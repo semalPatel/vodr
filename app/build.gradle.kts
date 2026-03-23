@@ -50,6 +50,7 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.57.1")
     implementation(project(":core-ai"))
     implementation(project(":core-parser"))
+    implementation(project(":core-playback"))
     implementation(project(":core-segmentation"))
     implementation(project(":feature-generate"))
     implementation(project(":feature-library"))
