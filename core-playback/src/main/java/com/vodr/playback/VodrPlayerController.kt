@@ -3,6 +3,7 @@ package com.vodr.playback
 data class PlaybackChapter(
     val id: String,
     val title: String,
+    val text: String,
 )
 
 interface VodrPlayerController {

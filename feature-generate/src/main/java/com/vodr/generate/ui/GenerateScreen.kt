@@ -27,7 +27,7 @@ data class GenerationSourceDocument(
 @Composable
 fun GenerateScreen(
     documents: List<GenerationSourceDocument>,
-    onGenerateRequested: (documentId: String, mode: GenerationMode) -> Unit,
+    onGenerateRequested: (documentId: String, mode: GenerationMode) -> Boolean,
     onOpenPlayer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -35,6 +35,7 @@ fun GenerateScreen(
         mutableStateOf(documents.firstOrNull()?.id)
     }
     var selectedMode by remember { mutableStateOf(GenerationMode.BALANCED) }
+    var generationError by remember { mutableStateOf<String?>(null) }
 
     Surface(modifier = modifier) {
         Column(
@@ -78,11 +79,19 @@ fun GenerateScreen(
                 enabled = selectedDocumentId != null,
                 onClick = {
                     val documentId = selectedDocumentId ?: return@Button
-                    onGenerateRequested(documentId, selectedMode)
-                    onOpenPlayer()
+                    val generated = onGenerateRequested(documentId, selectedMode)
+                    if (generated) {
+                        generationError = null
+                        onOpenPlayer()
+                    } else {
+                        generationError = "Generation failed. Confirm this file has readable text."
+                    }
                 },
             ) {
                 Text(text = "Generate and Open Player")
+            }
+            if (generationError != null) {
+                Text(text = generationError!!)
             }
         }
     }

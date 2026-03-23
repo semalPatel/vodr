@@ -23,9 +23,9 @@ class PlayerViewModelTest {
 
         viewModel.updateQueue(
             listOf(
-                PlaybackChapter(id = "chapter-1", title = "One"),
-                PlaybackChapter(id = "chapter-2", title = "Two"),
-                PlaybackChapter(id = "chapter-3", title = "Three"),
+                PlaybackChapter(id = "chapter-1", title = "One", text = "Chapter one"),
+                PlaybackChapter(id = "chapter-2", title = "Two", text = "Chapter two"),
+                PlaybackChapter(id = "chapter-3", title = "Three", text = "Chapter three"),
             ),
         )
 
@@ -46,9 +46,9 @@ class PlayerViewModelTest {
 
         viewModel.updateQueue(
             listOf(
-                PlaybackChapter(id = "chapter-1", title = "One"),
-                PlaybackChapter(id = "chapter-2", title = "Two"),
-                PlaybackChapter(id = "chapter-3", title = "Three"),
+                PlaybackChapter(id = "chapter-1", title = "One", text = "Chapter one"),
+                PlaybackChapter(id = "chapter-2", title = "Two", text = "Chapter two"),
+                PlaybackChapter(id = "chapter-3", title = "Three", text = "Chapter three"),
             ),
         )
         viewModel.goToNextChapter()
@@ -58,15 +58,15 @@ class PlayerViewModelTest {
 
         viewModel.updateQueue(
             listOf(
-                PlaybackChapter(id = "chapter-1", title = "One"),
-                PlaybackChapter(id = "chapter-2", title = "Two"),
+                PlaybackChapter(id = "chapter-1", title = "One", text = "Chapter one"),
+                PlaybackChapter(id = "chapter-2", title = "Two", text = "Chapter two"),
             ),
         )
 
         assertEquals(
             listOf(
-                PlaybackChapter(id = "chapter-1", title = "One"),
-                PlaybackChapter(id = "chapter-2", title = "Two"),
+                PlaybackChapter(id = "chapter-1", title = "One", text = "Chapter one"),
+                PlaybackChapter(id = "chapter-2", title = "Two", text = "Chapter two"),
             ),
             viewModel.state.queue,
         )

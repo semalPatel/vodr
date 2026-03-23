@@ -66,42 +66,48 @@ fun VodrNavHost(
                 },
                 onGenerateRequested = { documentId, mode ->
                     val imported = importedDocuments.firstOrNull { it.id.toString() == documentId }
-                        ?: return@GenerateScreen
+                        ?: return@GenerateScreen false
                     val uri = Uri.parse(imported.metadata.sourceUri)
-                    val stream = context.contentResolver.openInputStream(uri) ?: return@GenerateScreen
+                    val stream = context.contentResolver.openInputStream(uri) ?: return@GenerateScreen false
                     stream.use { input ->
-                        val parser = DocumentParser()
-                        val parsed = parser.parse(
-                            inputStream = input,
-                            mimeType = imported.metadata.mimeType,
-                        )
-                        val chapters = toChapterTexts(parsed.text, parsed.chapters.map { it.startOffset })
-                        val chunks = Segmenter(ChunkPolicy(maxCharsPerChunk = 400)).segment(
-                            documentId = imported.id.toString(),
-                            chapters = chapters,
-                        )
-                        val promptBuilder = PersonalizationRouter(
-                            deviceCapabilityDetector = DefaultDeviceCapabilityDetector(),
-                            aICorePersonalizer = AICorePersonalizer(),
-                            mediaPipePersonalizer = MediaPipePersonalizer(),
-                        ).select()
-                        generatedQueue.clear()
-                        generatedQueue.addAll(
-                            chapters.indices.map { chapterIndex ->
-                                val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
-                                val chapterPreview = chapters[chapterIndex].take(60)
-                                val prompt = promptBuilder.buildPrompt(
-                                    inputText = chapterPreview,
-                                    tone = "neutral",
-                                    style = mode.name.lowercase(),
-                                )
-                                PlaybackChapter(
-                                    id = "${imported.id}-$chapterIndex",
-                                    title = "Chapter ${chapterIndex + 1} (${chapterChunkCount} chunks) ${prompt.take(24)}",
-                                )
-                            },
-                        )
+                        runCatching {
+                            val parser = DocumentParser()
+                            val parsed = parser.parse(
+                                inputStream = input,
+                                mimeType = imported.metadata.mimeType,
+                            )
+                            val chapters = toChapterTexts(parsed.text, parsed.chapters.map { it.startOffset })
+                            val chunks = Segmenter(ChunkPolicy(maxCharsPerChunk = 400)).segment(
+                                documentId = imported.id.toString(),
+                                chapters = chapters,
+                            )
+                            val promptBuilder = PersonalizationRouter(
+                                deviceCapabilityDetector = DefaultDeviceCapabilityDetector(),
+                                aICorePersonalizer = AICorePersonalizer(),
+                                mediaPipePersonalizer = MediaPipePersonalizer(),
+                            ).select()
+                            generatedQueue.clear()
+                            generatedQueue.addAll(
+                                chapters.indices.map { chapterIndex ->
+                                    val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
+                                    val chapterPreview = chapters[chapterIndex].take(60)
+                                    val prompt = promptBuilder.buildPrompt(
+                                        inputText = chapterPreview,
+                                        tone = "neutral",
+                                        style = mode.name.lowercase(),
+                                    )
+                                    PlaybackChapter(
+                                        id = "${imported.id}-$chapterIndex",
+                                        title = "Chapter ${chapterIndex + 1} (${chapterChunkCount} chunks) ${prompt.take(24)}",
+                                        text = chapters[chapterIndex],
+                                    )
+                                },
+                            )
+                        }.getOrElse {
+                            generatedQueue.clear()
+                        }
                     }
+                    generatedQueue.isNotEmpty()
                 },
                 onOpenPlayer = {
                     navController.navigate(VodrNavRoutes.playerRoute)
