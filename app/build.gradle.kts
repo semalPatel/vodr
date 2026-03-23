@@ -49,6 +49,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("com.google.dagger:hilt-android:2.57.1")
     implementation(project(":feature-library"))
+    implementation(project(":feature-player"))
 
     kapt("com.google.dagger:hilt-android-compiler:2.57.1")
 

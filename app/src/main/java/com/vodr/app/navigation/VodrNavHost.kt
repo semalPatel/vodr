@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.vodr.library.ui.LibraryScreen
+import com.vodr.player.ui.PlayerScreen
 
 object VodrNavRoutes {
     const val libraryRoute = "library"
@@ -30,6 +31,7 @@ fun VodrNavHost(
         composable(VodrNavRoutes.generateRoute) {
         }
         composable(VodrNavRoutes.playerRoute) {
+            PlayerScreen()
         }
     }
 }
