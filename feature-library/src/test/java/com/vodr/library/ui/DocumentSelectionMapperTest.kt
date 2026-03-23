@@ -37,6 +37,20 @@ class DocumentSelectionMapperTest {
     }
 
     @Test
+    fun maps_pdf_when_provider_uses_x_pdf_mime_type() {
+        val request = toImportDocumentRequest(
+            sourceUri = "content://docs/4",
+            displayName = "Scan",
+            detectedMimeType = "application/x-pdf",
+            byteCount = null,
+            lastModifiedEpochMs = null,
+        )
+
+        requireNotNull(request)
+        assertEquals("application/pdf", request.mimeType)
+    }
+
+    @Test
     fun returns_null_for_unsupported_document_type() {
         val request = toImportDocumentRequest(
             sourceUri = "content://docs/3",

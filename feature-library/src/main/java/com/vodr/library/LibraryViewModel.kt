@@ -38,4 +38,10 @@ class LibraryViewModel(
             return null
         }
     }
+
+    fun reportUnsupportedSelection() {
+        state = state.copy(
+            errorMessage = "Unsupported file. Please select a PDF or EPUB document.",
+        )
+    }
 }

@@ -71,7 +71,10 @@ fun LibraryScreen(
             val imported = viewModel.importDocument(request = request)
             if (imported != null) {
                 onDocumentImported(imported)
+                onOpenGenerate()
             }
+        } else {
+            viewModel.reportUnsupportedSelection()
         }
     }
 
@@ -153,10 +156,12 @@ private fun normalizeSupportedMimeType(
     detectedMimeType: String?,
     displayName: String,
 ): String? {
+    val normalizedDetectedMimeType = detectedMimeType?.trim()?.lowercase()
     return when {
-        detectedMimeType == "application/pdf" -> "application/pdf"
-        detectedMimeType == "application/epub+zip" -> "application/epub+zip"
-        detectedMimeType == "application/epub" -> "application/epub+zip"
+        normalizedDetectedMimeType == "application/pdf" -> "application/pdf"
+        normalizedDetectedMimeType == "application/x-pdf" -> "application/pdf"
+        normalizedDetectedMimeType == "application/epub+zip" -> "application/epub+zip"
+        normalizedDetectedMimeType == "application/epub" -> "application/epub+zip"
         displayName.lowercase().endsWith(".pdf") -> "application/pdf"
         displayName.lowercase().endsWith(".epub") -> "application/epub+zip"
         else -> null
