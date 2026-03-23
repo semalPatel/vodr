@@ -1,5 +1,8 @@
 package com.vodr.library.ui
 
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.vodr.library.ImportDocumentRequest
@@ -23,7 +27,47 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = remember { LibraryViewModel() },
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val state = viewModel.state
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        val contentResolver = context.contentResolver
+        val detectedMimeType = contentResolver.getType(uri)
+        var displayName = uri.lastPathSegment ?: "document"
+        var byteCount: Long? = null
+        contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val displayNameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (displayNameIndex >= 0) {
+                    displayName = cursor.getString(displayNameIndex) ?: displayName
+                }
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+                    byteCount = cursor.getLong(sizeIndex)
+                }
+            }
+        }
+        val request = toImportDocumentRequest(
+            sourceUri = uri.toString(),
+            displayName = displayName,
+            detectedMimeType = detectedMimeType,
+            byteCount = byteCount,
+            lastModifiedEpochMs = null,
+        )
+        if (request != null) {
+            viewModel.importDocument(request = request)
+        }
+    }
 
     Surface(modifier = modifier) {
         Column(
@@ -42,18 +86,15 @@ fun LibraryScreen(
             )
             Button(
                 onClick = {
-                    viewModel.importDocument(
-                        request = ImportDocumentRequest(
-                            sourceUri = "content://documents/document/sample",
-                            displayName = "Sample.pdf",
-                            mimeType = "application/pdf",
-                            byteCount = 0L,
-                            lastModifiedEpochMs = null,
+                    openDocumentLauncher.launch(
+                        arrayOf(
+                            "application/pdf",
+                            "application/epub+zip",
                         ),
                     )
                 },
             ) {
-                Text(text = "Import sample PDF")
+                Text(text = "Import PDF/EPUB")
             }
             if (state.errorMessage != null) {
                 Text(text = state.errorMessage)
@@ -74,5 +115,39 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+}
+
+internal fun toImportDocumentRequest(
+    sourceUri: String,
+    displayName: String,
+    detectedMimeType: String?,
+    byteCount: Long?,
+    lastModifiedEpochMs: Long?,
+): ImportDocumentRequest? {
+    val normalizedMimeType = normalizeSupportedMimeType(
+        detectedMimeType = detectedMimeType,
+        displayName = displayName,
+    ) ?: return null
+    return ImportDocumentRequest(
+        sourceUri = sourceUri,
+        displayName = displayName,
+        mimeType = normalizedMimeType,
+        byteCount = byteCount,
+        lastModifiedEpochMs = lastModifiedEpochMs,
+    )
+}
+
+private fun normalizeSupportedMimeType(
+    detectedMimeType: String?,
+    displayName: String,
+): String? {
+    return when {
+        detectedMimeType == "application/pdf" -> "application/pdf"
+        detectedMimeType == "application/epub+zip" -> "application/epub+zip"
+        detectedMimeType == "application/epub" -> "application/epub+zip"
+        displayName.lowercase().endsWith(".pdf") -> "application/pdf"
+        displayName.lowercase().endsWith(".epub") -> "application/epub+zip"
+        else -> null
     }
 }
