@@ -2,7 +2,7 @@ package com.vodr.library
 
 class ImportDocumentUseCase(
     private val repository: DocumentMetadataRepository = InMemoryDocumentMetadataRepository(),
-    private val acceptedMimeTypes: Set<String> = setOf("application/pdf", "text/plain"),
+    private val acceptedMimeTypes: Set<String> = setOf("application/pdf", "application/epub+zip"),
 ) {
     val supportedMimeTypes: Set<String> = acceptedMimeTypes
 

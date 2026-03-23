@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -9,6 +10,10 @@ android {
 
     defaultConfig {
         minSdk = 24
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
@@ -28,5 +33,13 @@ kotlin {
 }
 
 dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2026.02.01")
+
+    implementation(composeBom)
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.ui:ui")
+
     testImplementation("junit:junit:4.13.2")
 }

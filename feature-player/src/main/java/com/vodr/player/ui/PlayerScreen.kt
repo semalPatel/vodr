@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,9 +21,15 @@ import com.vodr.player.PlayerViewModel
 
 @Composable
 fun PlayerScreen(
+    queue: List<PlaybackChapter> = emptyList(),
     viewModel: PlayerViewModel = remember { PlayerViewModel() },
     modifier: Modifier = Modifier,
 ) {
+    LaunchedEffect(queue) {
+        if (queue.isNotEmpty()) {
+            viewModel.updateQueue(queue)
+        }
+    }
     val state = viewModel.state
 
     Surface(modifier = modifier) {
@@ -45,20 +52,6 @@ fun PlayerScreen(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row {
-                Button(
-                    onClick = {
-                        viewModel.updateQueue(
-                            listOf(
-                                PlaybackChapter(id = "chapter-1", title = "One"),
-                                PlaybackChapter(id = "chapter-2", title = "Two"),
-                                PlaybackChapter(id = "chapter-3", title = "Three"),
-                            ),
-                        )
-                    },
-                ) {
-                    Text(text = "Load sample queue")
-                }
-                Spacer(modifier = Modifier.width(12.dp))
                 Button(onClick = viewModel::goToPreviousChapter) {
                     Text(text = "Prev")
                 }

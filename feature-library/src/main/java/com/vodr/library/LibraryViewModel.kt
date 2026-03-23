@@ -19,7 +19,7 @@ class LibraryViewModel(
     fun importDocument(
         request: ImportDocumentRequest,
         currentTimeEpochMs: Long = System.currentTimeMillis(),
-    ) {
+    ): ImportedDocument? {
         state = try {
             val document = importDocumentUseCase.importDocument(
                 request = request,
@@ -30,10 +30,12 @@ class LibraryViewModel(
                 lastImportedDocumentId = document.id,
                 errorMessage = null,
             )
+            return document
         } catch (exception: IllegalArgumentException) {
             state.copy(
                 errorMessage = exception.message,
             )
+            return null
         }
     }
 }

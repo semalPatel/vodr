@@ -20,11 +20,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.vodr.library.ImportDocumentRequest
+import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel = remember { LibraryViewModel() },
+    onDocumentImported: (ImportedDocument) -> Unit = {},
+    onOpenGenerate: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -65,7 +68,10 @@ fun LibraryScreen(
             lastModifiedEpochMs = null,
         )
         if (request != null) {
-            viewModel.importDocument(request = request)
+            val imported = viewModel.importDocument(request = request)
+            if (imported != null) {
+                onDocumentImported(imported)
+            }
         }
     }
 
@@ -98,6 +104,11 @@ fun LibraryScreen(
             }
             if (state.errorMessage != null) {
                 Text(text = state.errorMessage)
+            }
+            if (state.documents.isNotEmpty()) {
+                Button(onClick = onOpenGenerate) {
+                    Text(text = "Go to Generate")
+                }
             }
             if (state.documents.isEmpty()) {
                 Text(text = "No documents imported yet.")

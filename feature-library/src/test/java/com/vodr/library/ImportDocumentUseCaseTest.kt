@@ -20,16 +20,16 @@ class ImportDocumentUseCaseTest {
     }
 
     @Test
-    fun acceptsPdfAndPlainTextMimeTypes() {
+    fun acceptsPdfAndEpubMimeTypes() {
         val useCase = ImportDocumentUseCase(repository = FakeDocumentMetadataRepository())
 
         assertEquals(
-            setOf("application/pdf", "text/plain"),
+            setOf("application/pdf", "application/epub+zip"),
             useCase.supportedMimeTypes,
         )
         assertTrue(useCase.isSupportedMimeType("application/pdf"))
-        assertTrue(useCase.isSupportedMimeType("text/plain"))
-        assertFalse(useCase.isSupportedMimeType("application/epub+zip"))
+        assertTrue(useCase.isSupportedMimeType("application/epub+zip"))
+        assertFalse(useCase.isSupportedMimeType("text/plain"))
     }
 
     @Test

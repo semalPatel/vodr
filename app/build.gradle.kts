@@ -48,6 +48,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("com.google.dagger:hilt-android:2.57.1")
+    implementation(project(":core-ai"))
+    implementation(project(":core-parser"))
+    implementation(project(":core-segmentation"))
+    implementation(project(":feature-generate"))
     implementation(project(":feature-library"))
     implementation(project(":feature-player"))
 

@@ -1,0 +1,89 @@
+package com.vodr.generate.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.vodr.generate.GenerationMode
+
+data class GenerationSourceDocument(
+    val id: String,
+    val displayName: String,
+)
+
+@Composable
+fun GenerateScreen(
+    documents: List<GenerationSourceDocument>,
+    onGenerateRequested: (documentId: String, mode: GenerationMode) -> Unit,
+    onOpenPlayer: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var selectedDocumentId by remember(documents) {
+        mutableStateOf(documents.firstOrNull()?.id)
+    }
+    var selectedMode by remember { mutableStateOf(GenerationMode.BALANCED) }
+
+    Surface(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "Generate",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            if (documents.isEmpty()) {
+                Text(text = "Import a PDF/EPUB in Library first.")
+                return@Column
+            }
+
+            Text(text = "Document")
+            documents.forEach { document ->
+                OutlinedButton(
+                    onClick = { selectedDocumentId = document.id },
+                ) {
+                    val marker = if (selectedDocumentId == document.id) "[selected] " else ""
+                    Text(text = marker + document.displayName)
+                }
+            }
+
+            Text(text = "Mode")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GenerationMode.entries.forEach { mode ->
+                    OutlinedButton(
+                        onClick = { selectedMode = mode },
+                    ) {
+                        val marker = if (selectedMode == mode) "* " else ""
+                        Text(text = marker + mode.name)
+                    }
+                }
+            }
+
+            Button(
+                enabled = selectedDocumentId != null,
+                onClick = {
+                    val documentId = selectedDocumentId ?: return@Button
+                    onGenerateRequested(documentId, selectedMode)
+                    onOpenPlayer()
+                },
+            ) {
+                Text(text = "Generate and Open Player")
+            }
+        }
+    }
+}
