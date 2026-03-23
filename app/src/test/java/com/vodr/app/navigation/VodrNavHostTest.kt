@@ -5,12 +5,13 @@ import org.junit.Test
 
 class VodrNavHostTest {
     @Test
-    fun `nav host exposes library generate and player routes with library start destination`() {
+    fun `nav host exposes library generate player and settings routes with library start destination`() {
         assertEquals(
             listOf(
                 VodrNavRoutes.libraryRoute,
                 VodrNavRoutes.generateRoute,
                 VodrNavRoutes.playerRoute,
+                VodrNavRoutes.settingsRoute,
             ),
             VodrNavRoutes.routes,
         )

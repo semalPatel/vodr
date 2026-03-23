@@ -40,6 +40,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.runtime:runtime")
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.room:room-runtime:2.7.0")
+    implementation(project(":core-data"))
 
+    testImplementation("androidx.test:core:1.6.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.13")
 }
