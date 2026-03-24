@@ -9,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -37,6 +38,7 @@ class SettingsPersistenceTest {
 
     @Test
     fun updatedSettingsPersistAndShapeNewGenerationRequests() {
+        runBlocking {
         val updatedSettings = UserSettingsEntity(
             voice = "narrator",
             speechRate = 1.25f,
@@ -52,5 +54,6 @@ class SettingsPersistenceTest {
         assertEquals("narrator", requestPayload.voice)
         assertEquals(1.25f, requestPayload.speechRate, 0.0f)
         assertEquals("warm", requestPayload.style)
+        }
     }
 }

@@ -9,8 +9,8 @@ import com.vodr.data.db.entity.UserSettingsEntity
 @Dao
 interface UserSettingsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsert(settings: UserSettingsEntity): Long
+    suspend fun upsert(settings: UserSettingsEntity): Long
 
     @Query("SELECT * FROM user_settings WHERE settingsId = :settingsId")
-    fun getById(settingsId: Long = UserSettingsEntity.DEFAULT_SETTINGS_ID): UserSettingsEntity?
+    suspend fun getById(settingsId: Long = UserSettingsEntity.DEFAULT_SETTINGS_ID): UserSettingsEntity?
 }

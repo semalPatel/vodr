@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,9 @@ import androidx.room.Room
 import com.vodr.data.db.VodrDatabase
 import com.vodr.data.db.dao.UserSettingsDao
 import com.vodr.data.db.entity.UserSettingsEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 data class GenerationRequestPayload(
     val voice: String,
@@ -35,11 +39,17 @@ data class GenerationRequestPayload(
 class SettingsRepository(
     private val userSettingsDao: UserSettingsDao,
 ) {
-    fun load(): UserSettingsEntity = userSettingsDao.getById() ?: UserSettingsEntity()
+    suspend fun load(): UserSettingsEntity {
+        return withContext(Dispatchers.IO) {
+            userSettingsDao.getById() ?: UserSettingsEntity()
+        }
+    }
 
-    fun save(settings: UserSettingsEntity): UserSettingsEntity {
-        userSettingsDao.upsert(settings)
-        return settings
+    suspend fun save(settings: UserSettingsEntity): UserSettingsEntity {
+        return withContext(Dispatchers.IO) {
+            userSettingsDao.upsert(settings)
+            settings
+        }
     }
 }
 
@@ -57,12 +67,24 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     repository: SettingsRepository = rememberSettingsRepository(),
 ) {
-    val initialSettings = remember { repository.load() }
-    var voice by rememberSaveable { mutableStateOf(initialSettings.voice) }
-    var speechRate by rememberSaveable { mutableStateOf(initialSettings.speechRate) }
-    var style by rememberSaveable { mutableStateOf(initialSettings.style) }
+    var voice by rememberSaveable { mutableStateOf(UserSettingsEntity.DEFAULT_VOICE) }
+    var speechRate by rememberSaveable { mutableStateOf(UserSettingsEntity.DEFAULT_SPEECH_RATE) }
+    var style by rememberSaveable { mutableStateOf(UserSettingsEntity.DEFAULT_STYLE) }
+    var isLoaded by remember { mutableStateOf(false) }
 
-    fun persist() {
+    LaunchedEffect(repository) {
+        val settings = repository.load()
+        voice = settings.voice
+        speechRate = settings.speechRate
+        style = settings.style
+        isLoaded = true
+    }
+
+    LaunchedEffect(voice, speechRate, style, isLoaded) {
+        if (!isLoaded) {
+            return@LaunchedEffect
+        }
+        delay(300)
         repository.save(
             UserSettingsEntity(
                 voice = voice,
@@ -93,7 +115,6 @@ fun SettingsScreen(
                     value = voice,
                     onValueChange = {
                         voice = it
-                        persist()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -106,7 +127,6 @@ fun SettingsScreen(
                     value = speechRate,
                     onValueChange = {
                         speechRate = it
-                        persist()
                     },
                     valueRange = 0.5f..2.0f,
                 )
@@ -118,7 +138,6 @@ fun SettingsScreen(
                     value = style,
                     onValueChange = {
                         style = it
-                        persist()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
