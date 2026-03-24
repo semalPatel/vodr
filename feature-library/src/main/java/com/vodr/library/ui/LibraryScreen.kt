@@ -5,15 +5,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -24,10 +31,12 @@ import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun LibraryScreen(
     viewModel: LibraryViewModel = remember { LibraryViewModel() },
     onDocumentImported: (ImportedDocument) -> Unit = {},
     onOpenGenerate: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -78,52 +87,70 @@ fun LibraryScreen(
         }
     }
 
-    Surface(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = "Library",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = "Import local documents and keep their metadata in the library.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(
-                onClick = {
-                    openDocumentLauncher.launch(
-                        arrayOf(
-                            "application/pdf",
-                            "application/epub+zip",
-                        ),
-                    )
-                },
-            ) {
-                Text(text = "Import PDF/EPUB")
-            }
-            if (state.errorMessage != null) {
-                Text(text = state.errorMessage)
-            }
-            if (state.documents.isNotEmpty()) {
-                Button(onClick = onOpenGenerate) {
-                    Text(text = "Go to Generate")
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text(text = "Library") },
+                actions = {
+                    TextButton(onClick = onOpenSettings) {
+                        Text(text = "Settings")
+                    }
                 }
-            }
-            if (state.documents.isEmpty()) {
-                Text(text = "No documents imported yet.")
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.documents.forEach { document ->
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Column {
-                                Text(text = document.metadata.displayName)
-                                Text(text = document.metadata.sourceUri)
+            )
+        },
+    ) { contentPadding ->
+        Surface(modifier = Modifier.padding(contentPadding)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "Import local documents and keep their metadata in the library.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Button(
+                    onClick = {
+                        openDocumentLauncher.launch(
+                            arrayOf(
+                                "application/pdf",
+                                "application/epub+zip",
+                            ),
+                        )
+                    },
+                ) {
+                    Text(text = "Import PDF/EPUB")
+                }
+                if (state.errorMessage != null) {
+                    Text(text = state.errorMessage)
+                }
+                if (state.documents.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = onOpenGenerate) {
+                            Text(text = "Go to Generate")
+                        }
+                    }
+                }
+                if (state.documents.isEmpty()) {
+                    Text(text = "No documents imported yet.")
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(
+                            items = state.documents,
+                            key = { it.id },
+                        ) { document ->
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text(text = document.metadata.displayName)
+                                    Text(text = document.metadata.sourceUri)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
                         }
                     }
                 }

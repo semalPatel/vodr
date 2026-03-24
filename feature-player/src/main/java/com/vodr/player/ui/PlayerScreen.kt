@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +30,7 @@ import com.vodr.player.PlayerViewModel
 import java.util.Locale
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun PlayerScreen(
     queue: List<PlaybackChapter> = emptyList(),
     viewModel: PlayerViewModel = remember { PlayerViewModel() },
@@ -68,53 +72,56 @@ fun PlayerScreen(
         }
     }
 
-    Surface(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = "Player",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = "Chapter ${state.currentChapterIndex + 1} of ${state.queue.size.coerceAtLeast(1)}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = "Resume position: ${state.resumePositionMs} ms",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = currentChapter?.title ?: "No generated chapter yet.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Row {
-                Button(onClick = viewModel::goToPreviousChapter) {
-                    Text(text = "Prev")
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Button(onClick = viewModel::goToNextChapter) {
-                    Text(text = "Next")
-                }
-            }
-            Button(
-                enabled = currentChapter != null && isTtsReady,
-                onClick = {
-                    val chapter = currentChapter ?: return@Button
-                    val tts = textToSpeech ?: return@Button
-                    if (isSpeaking) {
-                        tts.stop()
-                        isSpeaking = false
-                    } else {
-                        tts.speak(chapter.text, TextToSpeech.QUEUE_FLUSH, null, chapter.id)
-                        isSpeaking = true
-                    }
-                },
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(title = { Text(text = "Player") })
+        },
+    ) { contentPadding ->
+        Surface(modifier = Modifier.padding(contentPadding)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(text = if (isSpeaking) "Pause Narration" else "Play Narration")
+                Text(
+                    text = "Chapter ${state.currentChapterIndex + 1} of ${state.queue.size.coerceAtLeast(1)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = "Resume position: ${state.resumePositionMs} ms",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = currentChapter?.title ?: "No generated chapter yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row {
+                    Button(onClick = viewModel::goToPreviousChapter) {
+                        Text(text = "Prev")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(onClick = viewModel::goToNextChapter) {
+                        Text(text = "Next")
+                    }
+                }
+                Button(
+                    enabled = currentChapter != null && isTtsReady,
+                    onClick = {
+                        val chapter = currentChapter ?: return@Button
+                        val tts = textToSpeech ?: return@Button
+                        if (isSpeaking) {
+                            tts.stop()
+                            isSpeaking = false
+                        } else {
+                            tts.speak(chapter.text, TextToSpeech.QUEUE_FLUSH, null, chapter.id)
+                            isSpeaking = true
+                        }
+                    },
+                ) {
+                    Text(text = if (isSpeaking) "Pause Narration" else "Play Narration")
+                }
             }
         }
     }

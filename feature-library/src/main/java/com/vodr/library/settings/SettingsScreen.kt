@@ -4,11 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +52,7 @@ fun UserSettingsEntity.toGenerationRequestPayload(): GenerationRequestPayload {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     repository: SettingsRepository = rememberSettingsRepository(),
@@ -68,55 +72,58 @@ fun SettingsScreen(
         )
     }
 
-    Surface(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = "Voice",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            OutlinedTextField(
-                value = voice,
-                onValueChange = {
-                    voice = it
-                    persist()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Text(
-                text = "Speech rate: ${"%.2f".format(speechRate)}",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Slider(
-                value = speechRate,
-                onValueChange = {
-                    speechRate = it
-                    persist()
-                },
-                valueRange = 0.5f..2.0f,
-            )
-            Text(
-                text = "Style",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            OutlinedTextField(
-                value = style,
-                onValueChange = {
-                    style = it
-                    persist()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(title = { Text(text = "Settings") })
+        },
+    ) { contentPadding ->
+        Surface(modifier = Modifier.padding(contentPadding)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "Voice",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                OutlinedTextField(
+                    value = voice,
+                    onValueChange = {
+                        voice = it
+                        persist()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Text(
+                    text = "Speech rate: ${"%.2f".format(speechRate)}",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Slider(
+                    value = speechRate,
+                    onValueChange = {
+                        speechRate = it
+                        persist()
+                    },
+                    valueRange = 0.5f..2.0f,
+                )
+                Text(
+                    text = "Style",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                OutlinedTextField(
+                    value = style,
+                    onValueChange = {
+                        style = it
+                        persist()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
         }
     }
 }

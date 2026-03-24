@@ -52,6 +52,9 @@ fun VodrNavHost(
                 onOpenGenerate = {
                     navController.navigate(VodrNavRoutes.generateRoute)
                 },
+                onOpenSettings = {
+                    navController.navigate(VodrNavRoutes.settingsRoute)
+                },
             )
         }
         composable(VodrNavRoutes.generateRoute) {
