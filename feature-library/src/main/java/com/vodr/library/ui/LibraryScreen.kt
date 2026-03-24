@@ -5,15 +5,19 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
@@ -36,21 +40,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vodr.library.ImportDocumentRequest
+import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 fun LibraryScreen(
     viewModel: LibraryViewModel,
+    continueListeningTitle: String? = null,
+    continueListeningProgress: Float = 0f,
+    continueListeningStatus: String? = null,
     onOpenGenerate: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onResumePlayback: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -184,16 +196,34 @@ fun LibraryScreen(
                     .padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                LibraryHeroCard(
+                    documentCount = state.documents.size,
+                    isImporting = state.isImporting,
+                    onOpenGenerate = onOpenGenerate,
+                )
+                if (continueListeningTitle != null) {
+                    ContinueListeningCard(
+                        title = continueListeningTitle,
+                        progress = continueListeningProgress,
+                        status = continueListeningStatus ?: "Ready",
+                        onResumePlayback = onResumePlayback,
+                    )
+                }
                 Text(
                     text = "Recently opened books",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 if (state.errorMessage != null) {
-                    Text(text = state.errorMessage)
+                    Text(
+                        text = state.errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
                 Crossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
                     if (isEmpty) {
-                        Text(text = "No books yet. Tap Add Book to import your first title.")
+                        EmptyLibraryCard(
+                            onAddBook = { showAddSheet = true },
+                        )
                     } else {
                         LazyColumn(
                             contentPadding = PaddingValues(vertical = 8.dp),
@@ -211,31 +241,7 @@ fun LibraryScreen(
                                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                                     ),
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    ) {
-                                        Text(
-                                            text = document.metadata.displayName,
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            AssistChip(
-                                                onClick = {},
-                                                label = {
-                                                    Text(
-                                                        text = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
-                                                    )
-                                                },
-                                            )
-                                            document.metadata.byteCount?.let { size ->
-                                                AssistChip(
-                                                    onClick = {},
-                                                    label = { Text(text = "${size / 1024} KB") },
-                                                )
-                                            }
-                                        }
-                                    }
+                                    LibraryDocumentCardContent(document = document)
                                 }
                             }
                         }
@@ -245,6 +251,215 @@ fun LibraryScreen(
         }
     }
 }
+
+@Composable
+private fun LibraryHeroCard(
+    documentCount: Int,
+    isImporting: Boolean,
+    onOpenGenerate: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Your listening library",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = if (documentCount == 0) {
+                    "Import a book to create your first offline-ready listening session."
+                } else {
+                    "$documentCount imported book${if (documentCount == 1) "" else "s"} ready for generation and playback."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(text = if (isImporting) "Importing" else "Offline-first")
+                    },
+                )
+                TextButton(onClick = onOpenGenerate, enabled = documentCount > 0) {
+                    Text(text = "Open Generate")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueListeningCard(
+    title: String,
+    progress: Float,
+    status: String,
+    onResumePlayback: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.68f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Continue listening",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = status,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TextButton(onClick = onResumePlayback) {
+                Text(text = "Open player")
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyLibraryCard(
+    onAddBook: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "No books yet",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = "Tap Add Book to import a PDF or EPUB, then generate a spoken chapter queue.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onAddBook) {
+                Text(text = "Import your first book")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryDocumentCardContent(
+    document: ImportedDocument,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 56.dp, height = 72.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = document.metadata.displayName
+                    .take(2)
+                    .uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = document.metadata.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = buildDocumentSubtitle(document = document),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            text = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
+                        )
+                    },
+                )
+                AssistChip(
+                    onClick = {},
+                    label = { Text(text = relativeImportedLabel(document.metadata.importedAtEpochMs)) },
+                )
+            }
+        }
+    }
+}
+
+private fun buildDocumentSubtitle(document: ImportedDocument): String {
+    val sizeLabel = document.metadata.byteCount?.let(::toReadableSize) ?: "Unknown size"
+    return "$sizeLabel • ${relativeImportedLabel(document.metadata.importedAtEpochMs)}"
+}
+
+private fun relativeImportedLabel(
+    importedAtEpochMs: Long,
+    nowEpochMs: Long = System.currentTimeMillis(),
+): String {
+    val dayDelta = ((nowEpochMs - importedAtEpochMs).coerceAtLeast(0L) / DAY_IN_MS).toInt()
+    return when (dayDelta) {
+        0 -> "Added today"
+        1 -> "Added yesterday"
+        else -> "Added ${dayDelta}d ago"
+    }
+}
+
+private fun toReadableSize(byteCount: Long): String {
+    return when {
+        byteCount >= 1_048_576L -> String.format("%.1f MB", byteCount / 1_048_576f)
+        byteCount >= 1_024L -> "${byteCount / 1_024} KB"
+        else -> "$byteCount B"
+    }
+}
+
+private const val DAY_IN_MS: Long = 24L * 60L * 60L * 1_000L
 
 internal fun toImportDocumentRequest(
     sourceUri: String,

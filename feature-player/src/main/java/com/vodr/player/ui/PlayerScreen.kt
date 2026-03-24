@@ -1,14 +1,17 @@
 package com.vodr.player.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,9 +28,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,6 +62,11 @@ fun PlayerScreen(
     } else {
         (state.currentChapterIndex + 1).toFloat() / state.queue.size.toFloat()
     }
+    val chapterListeningProgress = if (state.currentChapterDurationMs > 0L) {
+        (state.resumePositionMs.toFloat() / state.currentChapterDurationMs.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
     val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
         state.playbackStatus == PlaybackStatus.PREPARING
     var isChapterMenuExpanded by remember { mutableStateOf(false) }
@@ -70,64 +80,67 @@ fun PlayerScreen(
         Surface(modifier = Modifier.padding(contentPadding)) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                LinearProgressIndicator(
-                    progress = { chapterProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics {
-                            contentDescription = "Chapter progress ${(chapterProgress * 100).toInt()} percent"
-                        },
+                PlayerHeroCard(
+                    chapterTitle = currentChapter?.title ?: "No generated chapter yet.",
+                    chapterIndex = state.currentChapterIndex + 1,
+                    chapterCount = state.queue.size.coerceAtLeast(1),
+                    chapterProgress = chapterProgress,
+                    listeningProgress = chapterListeningProgress,
+                    listeningLabel = "${formatPlaybackTime(state.resumePositionMs)} / ${formatPlaybackTime(state.currentChapterDurationMs)}",
+                    isVoiceReady = state.isVoiceReady,
+                    playbackStatusLabel = state.playbackStatus.toReadableLabel(),
+                    personalizationProviderLabel = personalizationProviderLabel,
+                    transcriptionProviderLabel = transcriptionProviderLabel,
                 )
-                Text(
-                    text = "Chapter ${state.currentChapterIndex + 1} of ${state.queue.size.coerceAtLeast(1)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(
-                        onClick = {},
-                        label = {
-                            Text(text = if (state.isVoiceReady) "Voice Ready" else "Preparing Voice")
-                        },
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = { Text(text = state.playbackStatus.toReadableLabel()) },
-                    )
-                }
-                if (personalizationProviderLabel != null || transcriptionProviderLabel != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        personalizationProviderLabel?.let { label ->
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(text = "AI: $label") },
+                currentChapter?.let { chapter ->
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        ),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                text = "Chapter preview",
+                                style = MaterialTheme.typography.titleMedium,
                             )
-                        }
-                        transcriptionProviderLabel?.let { label ->
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(text = "Transcript: $label") },
+                            Text(
+                                text = chapter.text.take(260),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 6,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
-                Text(
-                    text = "Resume position: ${state.resumePositionMs} ms",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = currentChapter?.title ?: "No generated chapter yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         enabled = currentChapter != null,
                         onClick = viewModel::goToPreviousChapter,
                     ) {
                         Text(text = "Prev")
+                    }
+                    Button(
+                        enabled = currentChapter != null && state.isVoiceReady,
+                        modifier = Modifier.semantics {
+                            contentDescription = if (isPlaying) {
+                                "Pause narration"
+                            } else {
+                                "Start narration"
+                            }
+                        },
+                        onClick = viewModel::togglePlayback,
+                    ) {
+                        Text(text = if (isPlaying) "Pause" else "Play")
                     }
                     Button(
                         enabled = currentChapter != null,
@@ -170,29 +183,22 @@ fun PlayerScreen(
                         Text(text = "+15s")
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
-                        FilterChip(
-                            selected = state.playbackSpeed == speed,
-                            onClick = {
-                                viewModel.updatePlaybackSpeed(speed)
-                            },
-                            label = { Text(text = "${speed}x") },
-                        )
-                    }
-                }
-                Button(
-                    enabled = currentChapter != null && state.isVoiceReady,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isPlaying) {
-                            "Pause narration"
-                        } else {
-                            "Start narration"
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Playback speed",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
+                            FilterChip(
+                                selected = state.playbackSpeed == speed,
+                                onClick = {
+                                    viewModel.updatePlaybackSpeed(speed)
+                                },
+                                label = { Text(text = "${speed}x") },
+                            )
                         }
-                    },
-                    onClick = viewModel::togglePlayback,
-                ) {
-                    Text(text = if (isPlaying) "Pause Narration" else "Play Narration")
+                    }
                 }
                 state.errorMessage?.let { errorMessage ->
                     Text(
@@ -200,6 +206,111 @@ fun PlayerScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerHeroCard(
+    chapterTitle: String,
+    chapterIndex: Int,
+    chapterCount: Int,
+    chapterProgress: Float,
+    listeningProgress: Float,
+    listeningLabel: String,
+    isVoiceReady: Boolean,
+    playbackStatusLabel: String,
+    personalizationProviderLabel: String?,
+    transcriptionProviderLabel: String?,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .semantics {
+                            contentDescription = "Current chapter artwork placeholder"
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = chapterIndex.toString(),
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Text(
+                text = "Now Playing",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = chapterTitle,
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                text = "Chapter $chapterIndex of $chapterCount",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LinearProgressIndicator(
+                progress = { chapterProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = "Chapter progress ${(chapterProgress * 100).toInt()} percent"
+                    },
+            )
+            LinearProgressIndicator(
+                progress = { listeningProgress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = listeningLabel,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(text = if (isVoiceReady) "Voice Ready" else "Preparing Voice")
+                    },
+                )
+                AssistChip(
+                    onClick = {},
+                    label = { Text(text = playbackStatusLabel) },
+                )
+            }
+            if (personalizationProviderLabel != null || transcriptionProviderLabel != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    personalizationProviderLabel?.let { label ->
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(text = "AI: $label") },
+                        )
+                    }
+                    transcriptionProviderLabel?.let { label ->
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(text = "Transcript: $label") },
+                        )
+                    }
                 }
             }
         }
@@ -214,4 +325,11 @@ private fun PlaybackStatus.toReadableLabel(): String {
         PlaybackStatus.PAUSED -> "Paused"
         PlaybackStatus.ERROR -> "Error"
     }
+}
+
+private fun formatPlaybackTime(durationMs: Long): String {
+    val totalSeconds = (durationMs / 1_000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return "%d:%02d".format(minutes, seconds)
 }

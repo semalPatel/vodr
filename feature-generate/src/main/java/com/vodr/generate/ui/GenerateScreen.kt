@@ -2,12 +2,15 @@ package com.vodr.generate.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -28,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.vodr.ai.toDisplayName
+import com.vodr.generate.GenerationPhase
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
@@ -75,10 +79,14 @@ fun GenerateScreen(
                 }
 
                 Text(
-                    text = "Build chapter playback from imported text",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Turn any imported book into a focused listening session.",
+                    style = MaterialTheme.typography.bodyLarge,
                 )
-                Text(text = "Document")
+                GenerationStatusCard(generationState = generationState)
+                Text(
+                    text = "Document",
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 documents.forEach { document ->
                     val isSelected = selectedDocumentId == document.id
                     if (isSelected) {
@@ -98,7 +106,10 @@ fun GenerateScreen(
                     }
                 }
 
-                Text(text = "Mode")
+                Text(
+                    text = "Mode",
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -126,41 +137,111 @@ fun GenerateScreen(
                 ) {
                     Text(text = if (generationState.isGenerating) "Generating..." else "Generate and Open Player")
                 }
-                if (generationState.isGenerating) {
-                    CircularProgressIndicator()
-                }
-                generationState.runtimeSummary?.let { runtimeSummary ->
-                    Text(
-                        text = "Active Providers",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = {
-                            Text(
-                                text = "Personalization: ${runtimeSummary.personalizationProvider.toDisplayName()}",
-                            )
-                        },
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = {
-                            Text(
-                                text = "Transcription: ${runtimeSummary.transcriptionProvider.toDisplayName()}",
-                            )
-                        },
-                    )
-                    runtimeSummary.personalizationDetail?.let { detail ->
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenerationStatusCard(
+    generationState: GenerationUiState,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = generationState.phase.title,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = generationState.phase.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (generationState.isGenerating) {
+                LinearProgressIndicator(
+                    progress = { generationState.phase.progress },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AssistChip(
+                    onClick = {},
+                    label = {
                         Text(
-                            text = detail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = if (generationState.isGenerating) {
+                                "Working"
+                            } else {
+                                "Idle"
+                            },
                         )
-                    }
+                    },
+                )
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            text = when (generationState.phase) {
+                                GenerationPhase.IDLE -> "Awaiting input"
+                                GenerationPhase.READY -> "Queue ready"
+                                else -> "Phase ${(generationState.phase.progress * 100).toInt()}%"
+                            },
+                        )
+                    },
+                )
+            }
+            generationState.runtimeSummary?.let { runtimeSummary ->
+                Text(
+                    text = "Active Providers",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            text = "Personalization: ${runtimeSummary.personalizationProvider.toDisplayName()}",
+                        )
+                    },
+                )
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            text = "Transcription: ${runtimeSummary.transcriptionProvider.toDisplayName()}",
+                        )
+                    },
+                )
+                runtimeSummary.personalizationDetail?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                if (generationState.error != null) {
-                    Text(text = generationState.error.toUserMessage())
+                runtimeSummary.transcriptionDetail?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+            }
+            generationState.error?.let {
+                Text(
+                    text = it.toUserMessage(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }

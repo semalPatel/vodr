@@ -19,6 +19,7 @@ data class GenerationUiState(
     val queue: List<PlaybackChapter> = emptyList(),
     val error: GenerationError? = null,
     val runtimeSummary: GenerationRuntimeSummary? = null,
+    val phase: GenerationPhase = GenerationPhase.IDLE,
 )
 
 class GenerationViewModel(
@@ -41,6 +42,7 @@ class GenerationViewModel(
                     queue = emptyList(),
                     error = null,
                     runtimeSummary = null,
+                    phase = GenerationPhase.PREPARING_INPUT,
                 )
             }
             val result = runCatching {
@@ -53,6 +55,11 @@ class GenerationViewModel(
                             mode = mode,
                             personalizationPreferences = personalizationPreferences,
                             inputStream = it,
+                            onProgress = { phase ->
+                                mutableState.update { current ->
+                                    current.copy(phase = phase)
+                                }
+                            },
                         )
                     }
                 }
@@ -65,6 +72,7 @@ class GenerationViewModel(
                             queue = emptyList(),
                             error = GenerationError.EmptyResult,
                             runtimeSummary = output.runtimeSummary,
+                            phase = GenerationPhase.READY,
                         )
                     } else {
                         GenerationUiState(
@@ -72,6 +80,7 @@ class GenerationViewModel(
                             queue = output.queue,
                             error = null,
                             runtimeSummary = output.runtimeSummary,
+                            phase = GenerationPhase.READY,
                         )
                     }
                 },
@@ -85,6 +94,7 @@ class GenerationViewModel(
                             GenerationError.ProcessingFailure(error.message)
                         },
                         runtimeSummary = null,
+                        phase = GenerationPhase.IDLE,
                     )
                 },
             )
@@ -92,6 +102,11 @@ class GenerationViewModel(
     }
 
     fun clearQueue() {
-        mutableState.update { it.copy(queue = emptyList()) }
+        mutableState.update {
+            it.copy(
+                queue = emptyList(),
+                phase = GenerationPhase.IDLE,
+            )
+        }
     }
 }

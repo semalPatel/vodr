@@ -23,6 +23,7 @@ data class PlaybackState(
     val queue: List<PlaybackChapter> = emptyList(),
     val currentChapterIndex: Int = 0,
     val resumePositionMs: Long = 0L,
+    val currentChapterDurationMs: Long = 0L,
     val playbackSpeed: Float = DEFAULT_PLAYBACK_SPEED,
     val playbackStatus: PlaybackStatus = PlaybackStatus.IDLE,
     val isVoiceReady: Boolean = false,
@@ -75,10 +76,17 @@ class InMemoryVodrPlayerController : VodrPlayerController {
         resumePositionMs: Long,
     ) {
         mutableState.update { current ->
+            val clampedIndex = clampChapterIndex(queue, currentChapterIndex)
             current.copy(
                 queue = queue,
-                currentChapterIndex = clampChapterIndex(queue, currentChapterIndex),
+                currentChapterIndex = clampedIndex,
                 resumePositionMs = resumePositionMs.coerceAtLeast(0L),
+                currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->
+                    PlaybackEstimator.estimatedDurationMs(
+                        text = chapter.text,
+                        playbackSpeed = current.playbackSpeed,
+                    )
+                } ?: 0L,
                 playbackStatus = if (queue.isEmpty()) PlaybackStatus.IDLE else current.playbackStatus,
                 errorMessage = null,
             )
@@ -110,6 +118,12 @@ class InMemoryVodrPlayerController : VodrPlayerController {
                 it.copy(
                     currentChapterIndex = it.currentChapterIndex + 1,
                     resumePositionMs = 0L,
+                    currentChapterDurationMs = it.queue.getOrNull(it.currentChapterIndex + 1)?.let { chapter ->
+                        PlaybackEstimator.estimatedDurationMs(
+                            text = chapter.text,
+                            playbackSpeed = it.playbackSpeed,
+                        )
+                    } ?: 0L,
                 )
             }
         }
@@ -122,6 +136,12 @@ class InMemoryVodrPlayerController : VodrPlayerController {
                 it.copy(
                     currentChapterIndex = it.currentChapterIndex - 1,
                     resumePositionMs = 0L,
+                    currentChapterDurationMs = it.queue.getOrNull(it.currentChapterIndex - 1)?.let { chapter ->
+                        PlaybackEstimator.estimatedDurationMs(
+                            text = chapter.text,
+                            playbackSpeed = it.playbackSpeed,
+                        )
+                    } ?: 0L,
                 )
             }
         }
@@ -143,15 +163,31 @@ class InMemoryVodrPlayerController : VodrPlayerController {
 
     override fun setPlaybackSpeed(playbackSpeed: Float) {
         mutableState.update {
-            it.copy(playbackSpeed = playbackSpeed.coerceIn(0.75f, 2.0f))
+            val clampedSpeed = playbackSpeed.coerceIn(0.75f, 2.0f)
+            it.copy(
+                playbackSpeed = clampedSpeed,
+                currentChapterDurationMs = it.currentChapter?.let { chapter ->
+                    PlaybackEstimator.estimatedDurationMs(
+                        text = chapter.text,
+                        playbackSpeed = clampedSpeed,
+                    )
+                } ?: 0L,
+            )
         }
     }
 
     override fun selectChapter(chapterIndex: Int) {
         mutableState.update { current ->
+            val clampedIndex = clampChapterIndex(current.queue, chapterIndex)
             current.copy(
-                currentChapterIndex = clampChapterIndex(current.queue, chapterIndex),
+                currentChapterIndex = clampedIndex,
                 resumePositionMs = 0L,
+                currentChapterDurationMs = current.queue.getOrNull(clampedIndex)?.let { chapter ->
+                    PlaybackEstimator.estimatedDurationMs(
+                        text = chapter.text,
+                        playbackSpeed = current.playbackSpeed,
+                    )
+                } ?: 0L,
             )
         }
     }

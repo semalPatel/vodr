@@ -71,11 +71,14 @@ class GenerationOrchestrator(
         mode: GenerationMode,
         personalizationPreferences: PersonalizationPreferences = PersonalizationPreferences(),
         inputStream: InputStream,
+        onProgress: (GenerationPhase) -> Unit = {},
     ): GenerationOutput {
+        onProgress(GenerationPhase.PARSING_DOCUMENT)
         val parsed = parser.parse(
             inputStream = inputStream,
             mimeType = document.mimeType,
         )
+        onProgress(GenerationPhase.SEGMENTING_CONTENT)
         val chapterTexts = toChapterTexts(
             fullText = parsed.text,
             starts = parsed.chapters.map { it.startOffset },
@@ -84,6 +87,7 @@ class GenerationOrchestrator(
             documentId = document.id,
             chapters = chapterTexts,
         )
+        onProgress(GenerationPhase.RESOLVING_PROVIDERS)
         val personalizationSelection = personalizationRouter.resolve(
             preferences = personalizationPreferences,
         )
@@ -96,6 +100,7 @@ class GenerationOrchestrator(
         val transcriptionEngine = transcriptionRouter.select(
             preferences = personalizationPreferences,
         )
+        onProgress(GenerationPhase.BUILDING_QUEUE)
         val queue = chapterTexts.indices.map { chapterIndex ->
             val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
             val chapterPreview = chapterTexts[chapterIndex].take(60)

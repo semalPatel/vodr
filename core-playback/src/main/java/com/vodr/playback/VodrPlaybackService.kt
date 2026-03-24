@@ -355,6 +355,12 @@ class VodrPlaybackService : MediaSessionService() {
                 } else {
                     player.currentPosition.coerceAtLeast(0L)
                 },
+                currentChapterDurationMs = snapshot.queue.getOrNull(currentChapterIndex)?.let { chapter ->
+                    PlaybackEstimator.estimatedDurationMs(
+                        text = chapter.text,
+                        playbackSpeed = player.playbackParameters.speed.coerceIn(0.75f, 2.0f),
+                    )
+                } ?: 0L,
                 playbackSpeed = player.playbackParameters.speed.coerceIn(0.75f, 2.0f),
                 playbackStatus = when {
                     errorMessage != null -> PlaybackStatus.ERROR
