@@ -13,86 +13,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.room.Room
-import com.vodr.data.db.VodrDatabase
-import com.vodr.data.db.dao.UserSettingsDao
-import com.vodr.data.db.entity.UserSettingsEntity
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-
-data class GenerationRequestPayload(
-    val voice: String,
-    val speechRate: Float,
-    val style: String,
-)
-
-class SettingsRepository(
-    private val userSettingsDao: UserSettingsDao,
-) {
-    suspend fun load(): UserSettingsEntity {
-        return withContext(Dispatchers.IO) {
-            userSettingsDao.getById() ?: UserSettingsEntity()
-        }
-    }
-
-    suspend fun save(settings: UserSettingsEntity): UserSettingsEntity {
-        return withContext(Dispatchers.IO) {
-            userSettingsDao.upsert(settings)
-            settings
-        }
-    }
-}
-
-fun UserSettingsEntity.toGenerationRequestPayload(): GenerationRequestPayload {
-    return GenerationRequestPayload(
-        voice = voice,
-        speechRate = speechRate,
-        style = style,
-    )
-}
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun SettingsScreen(
     modifier: Modifier = Modifier,
-    repository: SettingsRepository = rememberSettingsRepository(),
+    viewModel: SettingsViewModel = viewModel(),
 ) {
-    var voice by rememberSaveable { mutableStateOf(UserSettingsEntity.DEFAULT_VOICE) }
-    var speechRate by rememberSaveable { mutableStateOf(UserSettingsEntity.DEFAULT_SPEECH_RATE) }
-    var style by rememberSaveable { mutableStateOf(UserSettingsEntity.DEFAULT_STYLE) }
-    var isLoaded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(repository) {
-        val settings = repository.load()
-        voice = settings.voice
-        speechRate = settings.speechRate
-        style = settings.style
-        isLoaded = true
-    }
-
-    LaunchedEffect(voice, speechRate, style, isLoaded) {
-        if (!isLoaded) {
-            return@LaunchedEffect
-        }
-        delay(300)
-        repository.save(
-            UserSettingsEntity(
-                voice = voice,
-                speechRate = speechRate,
-                style = style,
-            ),
-        )
-    }
+    val state = viewModel.state.collectAsStateWithLifecycle().value
 
     Scaffold(
         modifier = modifier,
@@ -112,21 +44,21 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 OutlinedTextField(
-                    value = voice,
+                    value = state.voice,
                     onValueChange = {
-                        voice = it
+                        viewModel.updateVoice(it)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
                 Text(
-                    text = "Speech rate: ${"%.2f".format(speechRate)}",
+                    text = "Speech rate: ${"%.2f".format(state.speechRate)}",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Slider(
-                    value = speechRate,
+                    value = state.speechRate,
                     onValueChange = {
-                        speechRate = it
+                        viewModel.updateSpeechRate(it)
                     },
                     valueRange = 0.5f..2.0f,
                 )
@@ -135,9 +67,9 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 OutlinedTextField(
-                    value = style,
+                    value = state.style,
                     onValueChange = {
-                        style = it
+                        viewModel.updateStyle(it)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -146,20 +78,3 @@ fun SettingsScreen(
         }
     }
 }
-
-@Composable
-private fun rememberSettingsRepository(): SettingsRepository {
-    val context = LocalContext.current.applicationContext
-    return remember(context) {
-        val database = Room.databaseBuilder(
-            context,
-            VodrDatabase::class.java,
-            SETTINGS_DATABASE_NAME,
-        )
-            .fallbackToDestructiveMigration(dropAllTables = true)
-            .build()
-        SettingsRepository(database.userSettingsDao())
-    }
-}
-
-private const val SETTINGS_DATABASE_NAME = "vodr-settings.db"
