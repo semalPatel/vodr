@@ -5,11 +5,11 @@ internal fun personalizationCandidateProviders(
 ): List<PersonalizationProviderType> {
     return when (preferences.providerType) {
         PersonalizationProviderType.AUTO -> buildList {
+            add(PersonalizationProviderType.AI_CORE)
+            add(PersonalizationProviderType.MEDIA_PIPE)
             if (preferences.customProviderConfig.localModelPath.isNotBlank()) {
                 add(PersonalizationProviderType.CUSTOM_LOCAL_MODEL)
             }
-            add(PersonalizationProviderType.AI_CORE)
-            add(PersonalizationProviderType.MEDIA_PIPE)
             if (!preferences.offlineOnly &&
                 preferences.customProviderConfig.localEndpoint.isNotBlank()
             ) {
@@ -29,8 +29,6 @@ internal fun personalizationCandidateProviders(
         )
         PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> listOf(
             PersonalizationProviderType.CUSTOM_LOCAL_MODEL,
-            PersonalizationProviderType.AI_CORE,
-            PersonalizationProviderType.MEDIA_PIPE,
             PersonalizationProviderType.OFFLINE_HEURISTIC,
         )
         PersonalizationProviderType.CUSTOM_ENDPOINT -> buildList {
@@ -38,8 +36,6 @@ internal fun personalizationCandidateProviders(
             if (preferences.customProviderConfig.localModelPath.isNotBlank()) {
                 add(PersonalizationProviderType.CUSTOM_LOCAL_MODEL)
             }
-            add(PersonalizationProviderType.AI_CORE)
-            add(PersonalizationProviderType.MEDIA_PIPE)
             add(PersonalizationProviderType.OFFLINE_HEURISTIC)
         }
         PersonalizationProviderType.OFFLINE_HEURISTIC -> listOf(

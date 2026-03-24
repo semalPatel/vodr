@@ -116,6 +116,73 @@ class PersonalizationRouterTest {
     }
 
     @Test
+    fun autoModePrefersDeviceProviderBeforeConfiguredLocalModel() {
+        val detector = FakeDeviceCapabilityDetector(
+            DeviceCapabilities(
+                isFlagship = true,
+                supportsAICore = true,
+                supportsMediaPipe = true,
+            )
+        )
+        val localModelFile = File.createTempFile("vodr-auto-priority", ".gguf")
+        localModelFile.writeText("stub")
+        val aicore = AICorePersonalizer()
+        val localPersonalizer = CustomLocalModelPersonalizer()
+        val router = PersonalizationRouter(
+            deviceCapabilityDetector = detector,
+            aICorePersonalizer = aicore,
+            mediaPipePersonalizer = MediaPipePersonalizer(),
+            customLocalModelPersonalizer = localPersonalizer,
+            customEndpointPersonalizer = CustomEndpointPersonalizer(),
+            heuristicPersonalizer = HeuristicPersonalizer(),
+        )
+
+        val selected = router.select(
+            preferences = PersonalizationPreferences(
+                providerType = PersonalizationProviderType.AUTO,
+                customProviderConfig = CustomProviderConfig(
+                    localModelPath = localModelFile.absolutePath,
+                ),
+                offlineOnly = true,
+            )
+        )
+
+        assertSame(aicore, selected)
+    }
+
+    @Test
+    fun explicitLocalModelSelectionDoesNotFallBackToDeviceProvider() {
+        val detector = FakeDeviceCapabilityDetector(
+            DeviceCapabilities(
+                isFlagship = true,
+                supportsAICore = true,
+                supportsMediaPipe = true,
+            )
+        )
+        val heuristic = HeuristicPersonalizer()
+        val router = PersonalizationRouter(
+            deviceCapabilityDetector = detector,
+            aICorePersonalizer = AICorePersonalizer(),
+            mediaPipePersonalizer = MediaPipePersonalizer(),
+            customLocalModelPersonalizer = CustomLocalModelPersonalizer(),
+            customEndpointPersonalizer = CustomEndpointPersonalizer(),
+            heuristicPersonalizer = heuristic,
+        )
+
+        val selected = router.select(
+            preferences = PersonalizationPreferences(
+                providerType = PersonalizationProviderType.CUSTOM_LOCAL_MODEL,
+                customProviderConfig = CustomProviderConfig(
+                    localModelPath = "/path/that/does/not/exist.gguf",
+                ),
+                offlineOnly = true,
+            )
+        )
+
+        assertSame(heuristic, selected)
+    }
+
+    @Test
     fun offlineOnlyBlocksCustomEndpointAndFallsBackOffline() {
         val detector = FakeDeviceCapabilityDetector(
             DeviceCapabilities(

@@ -83,6 +83,11 @@ fun SettingsScreen(
                     text = "Personalization Provider",
                     style = MaterialTheme.typography.titleMedium,
                 )
+                Text(
+                    text = "Auto prefers device AI first, then your configured local model, then offline fallback.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     PersonalizationProviderType.entries.forEach { providerType ->
                         Row(
@@ -140,11 +145,11 @@ fun SettingsScreen(
 
 private fun PersonalizationProviderType.toReadableLabel(): String {
     return when (this) {
-        PersonalizationProviderType.AUTO -> "Auto"
+        PersonalizationProviderType.AUTO -> "Auto (Prefer Device AI)"
         PersonalizationProviderType.AI_CORE -> "AI Core"
         PersonalizationProviderType.MEDIA_PIPE -> "MediaPipe"
-        PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> "Custom Local Model"
-        PersonalizationProviderType.CUSTOM_ENDPOINT -> "Custom Endpoint"
+        PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> "Custom Local Model (Override Device AI)"
+        PersonalizationProviderType.CUSTOM_ENDPOINT -> "Custom Endpoint (Override Device AI)"
         PersonalizationProviderType.OFFLINE_HEURISTIC -> "Offline Fallback"
     }
 }
