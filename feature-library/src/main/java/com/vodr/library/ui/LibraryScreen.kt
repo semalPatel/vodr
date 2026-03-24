@@ -37,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,8 +124,10 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Button(
-                    modifier = Modifier.fillMaxWidth(),
                     enabled = !state.isImporting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "Import a PDF or EPUB book" },
                     onClick = {
                         showAddSheet = false
                         openDocumentLauncher.launch(
@@ -169,6 +173,7 @@ fun LibraryScreen(
                 onClick = { showAddSheet = true },
                 icon = { Text(text = "+") },
                 text = { Text(text = "Add Book") },
+                modifier = Modifier.semantics { contentDescription = "Add a new book" },
             )
         },
     ) { contentPadding ->
