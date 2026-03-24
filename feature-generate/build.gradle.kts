@@ -36,7 +36,12 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
 
     implementation(composeBom)
+    implementation(project(":core-ai"))
+    implementation(project(":core-parser"))
+    implementation(project(":core-playback"))
+    implementation(project(":core-segmentation"))
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)

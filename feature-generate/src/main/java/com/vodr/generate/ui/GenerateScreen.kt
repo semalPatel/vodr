@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.vodr.generate.GenerationMode
+import com.vodr.generate.GenerationUiState
 
 data class GenerationSourceDocument(
     val id: String,
@@ -27,7 +30,8 @@ data class GenerationSourceDocument(
 @Composable
 fun GenerateScreen(
     documents: List<GenerationSourceDocument>,
-    onGenerateRequested: (documentId: String, mode: GenerationMode) -> Boolean,
+    generationState: GenerationUiState,
+    onGenerateRequested: (documentId: String, mode: GenerationMode) -> Unit,
     onOpenPlayer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -35,7 +39,11 @@ fun GenerateScreen(
         mutableStateOf(documents.firstOrNull()?.id)
     }
     var selectedMode by remember { mutableStateOf(GenerationMode.BALANCED) }
-    var generationError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(generationState.queue) {
+        if (generationState.queue.isNotEmpty()) {
+            onOpenPlayer()
+        }
+    }
 
     Surface(modifier = modifier) {
         Column(
@@ -76,22 +84,19 @@ fun GenerateScreen(
             }
 
             Button(
-                enabled = selectedDocumentId != null,
+                enabled = selectedDocumentId != null && !generationState.isGenerating,
                 onClick = {
                     val documentId = selectedDocumentId ?: return@Button
-                    val generated = onGenerateRequested(documentId, selectedMode)
-                    if (generated) {
-                        generationError = null
-                        onOpenPlayer()
-                    } else {
-                        generationError = "Generation failed. Confirm this file has readable text."
-                    }
+                    onGenerateRequested(documentId, selectedMode)
                 },
             ) {
-                Text(text = "Generate and Open Player")
+                Text(text = if (generationState.isGenerating) "Generating..." else "Generate and Open Player")
             }
-            if (generationError != null) {
-                Text(text = generationError!!)
+            if (generationState.isGenerating) {
+                CircularProgressIndicator()
+            }
+            if (generationState.errorMessage != null) {
+                Text(text = generationState.errorMessage)
             }
         }
     }
