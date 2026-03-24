@@ -1,7 +1,7 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -33,18 +33,18 @@ kotlin {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.02.01")
+    val composeBom = platform(libs.androidx.compose.bom)
 
     implementation(composeBom)
-    implementation("androidx.activity:activity-compose:1.12.4")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.runtime:runtime")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.room:room-runtime:2.7.0")
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.room.runtime)
     implementation(project(":core-data"))
 
-    testImplementation("androidx.test:core:1.6.1")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
 }

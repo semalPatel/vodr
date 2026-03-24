@@ -1,9 +1,9 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.kapt")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.dagger.hilt.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt.android)
 }
 
 android {
@@ -37,17 +37,17 @@ kotlin {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.02.01")
+    val composeBom = platform(libs.androidx.compose.bom)
 
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    implementation("androidx.activity:activity-compose:1.12.4")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.navigation:navigation-compose:2.9.7")
-    implementation("com.google.dagger:hilt-android:2.57.1")
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.hilt.android)
     implementation(project(":core-ai"))
     implementation(project(":core-parser"))
     implementation(project(":core-playback"))
@@ -56,9 +56,9 @@ dependencies {
     implementation(project(":feature-library"))
     implementation(project(":feature-player"))
 
-    kapt("com.google.dagger:hilt-android-compiler:2.57.1")
+    kapt(libs.hilt.android.compiler)
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation(libs.androidx.compose.ui.tooling)
 
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit4)
 }

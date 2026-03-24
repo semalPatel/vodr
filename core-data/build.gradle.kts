@@ -1,7 +1,7 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.kapt")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
@@ -29,13 +29,13 @@ kotlin {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.17.0")
-    implementation("androidx.room:room-runtime:2.7.0")
-    implementation("androidx.room:room-ktx:2.7.0")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
 
-    kapt("androidx.room:room-compiler:2.7.0")
+    kapt(libs.androidx.room.compiler)
 
-    testImplementation("androidx.test:core:1.6.1")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
 }
