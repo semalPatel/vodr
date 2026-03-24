@@ -24,6 +24,11 @@ data class PersonalizationPreferences(
     val offlineOnly: Boolean = true,
 )
 
+data class ResolvedProviderSelection(
+    val providerType: PersonalizationProviderType,
+    val detail: String? = null,
+)
+
 enum class ProbeAvailability {
     AVAILABLE,
     UNAVAILABLE,
@@ -241,5 +246,16 @@ class OfflineHeuristicRuntimeProbe : PersonalizationRuntimeProbe {
             availability = ProbeAvailability.AVAILABLE,
             detail = "Offline heuristic fallback is always available.",
         )
+    }
+}
+
+fun PersonalizationProviderType.toDisplayName(): String {
+    return when (this) {
+        PersonalizationProviderType.AUTO -> "Auto"
+        PersonalizationProviderType.AI_CORE -> "AI Core"
+        PersonalizationProviderType.MEDIA_PIPE -> "MediaPipe"
+        PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> "Custom Local Model"
+        PersonalizationProviderType.CUSTOM_ENDPOINT -> "Custom Endpoint"
+        PersonalizationProviderType.OFFLINE_HEURISTIC -> "Offline Fallback"
     }
 }

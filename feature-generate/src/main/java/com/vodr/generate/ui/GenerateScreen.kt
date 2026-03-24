@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.vodr.ai.toDisplayName
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
@@ -126,6 +128,35 @@ fun GenerateScreen(
                 }
                 if (generationState.isGenerating) {
                     CircularProgressIndicator()
+                }
+                generationState.runtimeSummary?.let { runtimeSummary ->
+                    Text(
+                        text = "Active Providers",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    AssistChip(
+                        onClick = {},
+                        label = {
+                            Text(
+                                text = "Personalization: ${runtimeSummary.personalizationProvider.toDisplayName()}",
+                            )
+                        },
+                    )
+                    AssistChip(
+                        onClick = {},
+                        label = {
+                            Text(
+                                text = "Transcription: ${runtimeSummary.transcriptionProvider.toDisplayName()}",
+                            )
+                        },
+                    )
+                    runtimeSummary.personalizationDetail?.let { detail ->
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 if (generationState.error != null) {
                     Text(text = generationState.error.toUserMessage())

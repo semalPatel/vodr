@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.vodr.ai.CustomProviderConfig
 import com.vodr.ai.PersonalizationPreferences
+import com.vodr.ai.toDisplayName
 import com.vodr.generate.GenerationDocumentInput
 import com.vodr.generate.GenerationViewModel
 import com.vodr.generate.ui.GenerateScreen
@@ -110,7 +111,15 @@ fun VodrNavHost(
             )
         }
         composable(VodrRoute.Player.route) {
-            PlayerScreen(queue = generationState.queue)
+            PlayerScreen(
+                queue = generationState.queue,
+                personalizationProviderLabel = generationState.runtimeSummary
+                    ?.personalizationProvider
+                    ?.toDisplayName(),
+                transcriptionProviderLabel = generationState.runtimeSummary
+                    ?.transcriptionProvider
+                    ?.toDisplayName(),
+            )
         }
         composable(VodrRoute.Settings.route) {
             SettingsScreen(viewModel = settingsViewModel)

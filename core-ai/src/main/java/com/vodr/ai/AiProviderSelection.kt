@@ -43,3 +43,30 @@ internal fun personalizationCandidateProviders(
         )
     }
 }
+
+internal fun resolveProviderSelection(
+    preferences: PersonalizationPreferences,
+    probeRegistry: PersonalizationProbeRegistry,
+): ResolvedProviderSelection {
+    personalizationCandidateProviders(preferences).forEach { providerType ->
+        val result = probeRegistry.probe(
+            providerType = providerType,
+            preferences = preferences,
+        )
+        if (result.availability == ProbeAvailability.AVAILABLE) {
+            return ResolvedProviderSelection(
+                providerType = providerType,
+                detail = result.detail,
+            )
+        }
+    }
+
+    val fallback = probeRegistry.probe(
+        providerType = PersonalizationProviderType.OFFLINE_HEURISTIC,
+        preferences = preferences,
+    )
+    return ResolvedProviderSelection(
+        providerType = PersonalizationProviderType.OFFLINE_HEURISTIC,
+        detail = fallback.detail ?: "Offline fallback selected.",
+    )
+}

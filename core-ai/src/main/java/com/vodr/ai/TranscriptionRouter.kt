@@ -11,21 +11,21 @@ class TranscriptionRouter(
         HeuristicTranscriptionEngine(),
     private val probeRegistry: PersonalizationProbeRegistry,
 ) {
+    fun resolve(
+        preferences: PersonalizationPreferences = PersonalizationPreferences(),
+    ): ResolvedProviderSelection {
+        return resolveProviderSelection(
+            preferences = preferences,
+            probeRegistry = probeRegistry,
+        )
+    }
+
     fun select(
         preferences: PersonalizationPreferences = PersonalizationPreferences(),
     ): TranscriptionEngine {
-        val candidates = personalizationCandidateProviders(preferences)
-        return candidates.firstNotNullOfOrNull { providerType ->
-            val result = probeRegistry.probe(
-                providerType = providerType,
-                preferences = preferences,
-            )
-            if (result.availability == ProbeAvailability.AVAILABLE) {
-                engineFor(providerType)
-            } else {
-                null
-            }
-        } ?: heuristicTranscriptionEngine
+        return engineFor(
+            providerType = resolve(preferences).providerType,
+        )
     }
 
     private fun engineFor(

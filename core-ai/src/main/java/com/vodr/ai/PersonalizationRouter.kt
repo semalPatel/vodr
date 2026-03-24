@@ -23,21 +23,21 @@ class PersonalizationRouter(
         )
     ),
 ) {
+    fun resolve(
+        preferences: PersonalizationPreferences = PersonalizationPreferences(),
+    ): ResolvedProviderSelection {
+        return resolveProviderSelection(
+            preferences = preferences,
+            probeRegistry = probeRegistry,
+        )
+    }
+
     fun select(
         preferences: PersonalizationPreferences = PersonalizationPreferences(),
     ): Personalizer {
-        val candidates = personalizationCandidateProviders(preferences)
-        return candidates.firstNotNullOfOrNull { providerType ->
-            val result = probeRegistry.probe(
-                providerType = providerType,
-                preferences = preferences,
-            )
-            if (result.availability == ProbeAvailability.AVAILABLE) {
-                personalizerFor(providerType)
-            } else {
-                null
-            }
-        } ?: heuristicPersonalizer
+        return personalizerFor(
+            providerType = resolve(preferences).providerType,
+        )
     }
 
     private fun personalizerFor(

@@ -18,6 +18,7 @@ data class GenerationUiState(
     val isGenerating: Boolean = false,
     val queue: List<PlaybackChapter> = emptyList(),
     val error: GenerationError? = null,
+    val runtimeSummary: GenerationRuntimeSummary? = null,
 )
 
 class GenerationViewModel(
@@ -39,6 +40,7 @@ class GenerationViewModel(
                     isGenerating = true,
                     queue = emptyList(),
                     error = null,
+                    runtimeSummary = null,
                 )
             }
             val result = runCatching {
@@ -56,18 +58,20 @@ class GenerationViewModel(
                 }
             }
             mutableState.value = result.fold(
-                onSuccess = { queue ->
-                    if (queue.isEmpty()) {
+                onSuccess = { output ->
+                    if (output.queue.isEmpty()) {
                         GenerationUiState(
                             isGenerating = false,
                             queue = emptyList(),
                             error = GenerationError.EmptyResult,
+                            runtimeSummary = output.runtimeSummary,
                         )
                     } else {
                         GenerationUiState(
                             isGenerating = false,
-                            queue = queue,
+                            queue = output.queue,
                             error = null,
+                            runtimeSummary = output.runtimeSummary,
                         )
                     }
                 },
@@ -80,6 +84,7 @@ class GenerationViewModel(
                         } else {
                             GenerationError.ProcessingFailure(error.message)
                         },
+                        runtimeSummary = null,
                     )
                 },
             )

@@ -28,6 +28,18 @@ data class GenerationDocumentInput(
     val mimeType: String,
 )
 
+data class GenerationRuntimeSummary(
+    val personalizationProvider: com.vodr.ai.PersonalizationProviderType,
+    val personalizationDetail: String? = null,
+    val transcriptionProvider: com.vodr.ai.PersonalizationProviderType,
+    val transcriptionDetail: String? = null,
+)
+
+data class GenerationOutput(
+    val queue: List<PlaybackChapter>,
+    val runtimeSummary: GenerationRuntimeSummary,
+)
+
 class GenerationOrchestrator(
     private val parser: DocumentParser = DocumentParser(),
     private val segmenter: Segmenter = Segmenter(policy = ChunkPolicy(maxCharsPerChunk = 400)),
@@ -59,7 +71,7 @@ class GenerationOrchestrator(
         mode: GenerationMode,
         personalizationPreferences: PersonalizationPreferences = PersonalizationPreferences(),
         inputStream: InputStream,
-    ): List<PlaybackChapter> {
+    ): GenerationOutput {
         val parsed = parser.parse(
             inputStream = inputStream,
             mimeType = document.mimeType,
@@ -72,13 +84,19 @@ class GenerationOrchestrator(
             documentId = document.id,
             chapters = chapterTexts,
         )
+        val personalizationSelection = personalizationRouter.resolve(
+            preferences = personalizationPreferences,
+        )
+        val transcriptionSelection = transcriptionRouter.resolve(
+            preferences = personalizationPreferences,
+        )
         val promptBuilder = personalizationRouter.select(
             preferences = personalizationPreferences,
         )
         val transcriptionEngine = transcriptionRouter.select(
             preferences = personalizationPreferences,
         )
-        return chapterTexts.indices.map { chapterIndex ->
+        val queue = chapterTexts.indices.map { chapterIndex ->
             val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
             val chapterPreview = chapterTexts[chapterIndex].take(60)
             val prompt = promptBuilder.buildPrompt(
@@ -97,6 +115,15 @@ class GenerationOrchestrator(
                 text = chapterTexts[chapterIndex],
             )
         }
+        return GenerationOutput(
+            queue = queue,
+            runtimeSummary = GenerationRuntimeSummary(
+                personalizationProvider = personalizationSelection.providerType,
+                personalizationDetail = personalizationSelection.detail,
+                transcriptionProvider = transcriptionSelection.providerType,
+                transcriptionDetail = transcriptionSelection.detail,
+            ),
+        )
     }
 
     private fun toChapterTexts(fullText: String, starts: List<Int>): List<String> {

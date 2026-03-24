@@ -39,6 +39,8 @@ import com.vodr.player.PlayerViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 fun PlayerScreen(
     queue: List<PlaybackChapter> = emptyList(),
+    personalizationProviderLabel: String? = null,
+    transcriptionProviderLabel: String? = null,
     viewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
 ) {
@@ -95,6 +97,22 @@ fun PlayerScreen(
                         onClick = {},
                         label = { Text(text = state.playbackStatus.toReadableLabel()) },
                     )
+                }
+                if (personalizationProviderLabel != null || transcriptionProviderLabel != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        personalizationProviderLabel?.let { label ->
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(text = "AI: $label") },
+                            )
+                        }
+                        transcriptionProviderLabel?.let { label ->
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(text = "Transcript: $label") },
+                            )
+                        }
+                    }
                 }
                 Text(
                     text = "Resume position: ${state.resumePositionMs} ms",
