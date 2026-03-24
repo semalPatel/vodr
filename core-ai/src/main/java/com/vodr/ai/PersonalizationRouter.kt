@@ -1,21 +1,104 @@
 package com.vodr.ai
 
 import com.vodr.ai.provider.AICorePersonalizer
+import com.vodr.ai.provider.CustomEndpointPersonalizer
+import com.vodr.ai.provider.CustomLocalModelPersonalizer
+import com.vodr.ai.provider.HeuristicPersonalizer
 import com.vodr.ai.provider.MediaPipePersonalizer
 
 class PersonalizationRouter(
     private val deviceCapabilityDetector: DeviceCapabilityDetector,
     private val aICorePersonalizer: AICorePersonalizer,
     private val mediaPipePersonalizer: MediaPipePersonalizer,
+    private val customLocalModelPersonalizer: CustomLocalModelPersonalizer = CustomLocalModelPersonalizer(),
+    private val customEndpointPersonalizer: CustomEndpointPersonalizer = CustomEndpointPersonalizer(),
+    private val heuristicPersonalizer: HeuristicPersonalizer = HeuristicPersonalizer(),
+    private val probeRegistry: PersonalizationProbeRegistry = PersonalizationProbeRegistry(
+        probes = listOf(
+            AICoreRuntimeProbe(deviceCapabilityDetector),
+            MediaPipeRuntimeProbe(deviceCapabilityDetector),
+            CustomLocalModelRuntimeProbe(),
+            CustomEndpointRuntimeProbe(),
+            OfflineHeuristicRuntimeProbe(),
+        )
+    ),
 ) {
+    fun select(
+        preferences: PersonalizationPreferences = PersonalizationPreferences(),
+    ): Personalizer {
+        val candidates = candidateProviders(preferences)
+        return candidates.firstNotNullOfOrNull { providerType ->
+            val result = probeRegistry.probe(
+                providerType = providerType,
+                preferences = preferences,
+            )
+            if (result.availability == ProbeAvailability.AVAILABLE) {
+                personalizerFor(providerType)
+            } else {
+                null
+            }
+        } ?: heuristicPersonalizer
+    }
 
-    fun select(): Personalizer {
-        val capabilities = deviceCapabilityDetector.detect()
+    private fun candidateProviders(
+        preferences: PersonalizationPreferences,
+    ): List<PersonalizationProviderType> {
+        return when (preferences.providerType) {
+            PersonalizationProviderType.AUTO -> buildList {
+                if (preferences.customProviderConfig.localModelPath.isNotBlank()) {
+                    add(PersonalizationProviderType.CUSTOM_LOCAL_MODEL)
+                }
+                add(PersonalizationProviderType.AI_CORE)
+                add(PersonalizationProviderType.MEDIA_PIPE)
+                if (!preferences.offlineOnly &&
+                    preferences.customProviderConfig.localEndpoint.isNotBlank()
+                ) {
+                    add(PersonalizationProviderType.CUSTOM_ENDPOINT)
+                }
+                add(PersonalizationProviderType.OFFLINE_HEURISTIC)
+            }
+            PersonalizationProviderType.AI_CORE -> listOf(
+                PersonalizationProviderType.AI_CORE,
+                PersonalizationProviderType.MEDIA_PIPE,
+                PersonalizationProviderType.OFFLINE_HEURISTIC,
+            )
+            PersonalizationProviderType.MEDIA_PIPE -> listOf(
+                PersonalizationProviderType.MEDIA_PIPE,
+                PersonalizationProviderType.AI_CORE,
+                PersonalizationProviderType.OFFLINE_HEURISTIC,
+            )
+            PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> listOf(
+                PersonalizationProviderType.CUSTOM_LOCAL_MODEL,
+                PersonalizationProviderType.AI_CORE,
+                PersonalizationProviderType.MEDIA_PIPE,
+                PersonalizationProviderType.OFFLINE_HEURISTIC,
+            )
+            PersonalizationProviderType.CUSTOM_ENDPOINT -> buildList {
+                add(PersonalizationProviderType.CUSTOM_ENDPOINT)
+                if (preferences.customProviderConfig.localModelPath.isNotBlank()) {
+                    add(PersonalizationProviderType.CUSTOM_LOCAL_MODEL)
+                }
+                add(PersonalizationProviderType.AI_CORE)
+                add(PersonalizationProviderType.MEDIA_PIPE)
+                add(PersonalizationProviderType.OFFLINE_HEURISTIC)
+            }
+            PersonalizationProviderType.OFFLINE_HEURISTIC -> listOf(
+                PersonalizationProviderType.OFFLINE_HEURISTIC,
+            )
+        }
+    }
 
-        return when {
-            capabilities.supportsAICore && capabilities.isFlagship -> aICorePersonalizer
-            capabilities.supportsMediaPipe -> mediaPipePersonalizer
-            else -> aICorePersonalizer
+    private fun personalizerFor(
+        providerType: PersonalizationProviderType,
+    ): Personalizer {
+        return when (providerType) {
+            PersonalizationProviderType.AI_CORE -> aICorePersonalizer
+            PersonalizationProviderType.MEDIA_PIPE -> mediaPipePersonalizer
+            PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> customLocalModelPersonalizer
+            PersonalizationProviderType.CUSTOM_ENDPOINT -> customEndpointPersonalizer
+            PersonalizationProviderType.OFFLINE_HEURISTIC,
+            PersonalizationProviderType.AUTO,
+            -> heuristicPersonalizer
         }
     }
 }

@@ -2,6 +2,7 @@ package com.vodr.library.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vodr.ai.PersonalizationProviderType
 import com.vodr.data.db.entity.UserSettingsEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -17,6 +18,12 @@ data class SettingsUiState(
     val voice: String = UserSettingsEntity.DEFAULT_VOICE,
     val speechRate: Float = UserSettingsEntity.DEFAULT_SPEECH_RATE,
     val style: String = UserSettingsEntity.DEFAULT_STYLE,
+    val personalizationProviderType: PersonalizationProviderType =
+        PersonalizationProviderType.valueOf(UserSettingsEntity.DEFAULT_PERSONALIZATION_PROVIDER_TYPE),
+    val customLocalModelPath: String = UserSettingsEntity.DEFAULT_CUSTOM_LOCAL_MODEL_PATH,
+    val customEndpoint: String = UserSettingsEntity.DEFAULT_CUSTOM_ENDPOINT,
+    val customModelName: String = UserSettingsEntity.DEFAULT_CUSTOM_MODEL_NAME,
+    val offlineOnly: Boolean = UserSettingsEntity.DEFAULT_OFFLINE_ONLY,
     val isLoaded: Boolean = false,
 )
 
@@ -35,6 +42,12 @@ class SettingsViewModel @Inject constructor(
                 voice = settings.voice,
                 speechRate = settings.speechRate,
                 style = settings.style,
+                personalizationProviderType = settings.personalizationProviderType
+                    .toPersonalizationProviderType(),
+                customLocalModelPath = settings.customLocalModelPath,
+                customEndpoint = settings.customEndpoint,
+                customModelName = settings.customModelName,
+                offlineOnly = settings.offlineOnly,
                 isLoaded = true,
             )
         }
@@ -55,6 +68,31 @@ class SettingsViewModel @Inject constructor(
         scheduleSave()
     }
 
+    fun updatePersonalizationProviderType(providerType: PersonalizationProviderType) {
+        mutableState.update { it.copy(personalizationProviderType = providerType) }
+        scheduleSave()
+    }
+
+    fun updateCustomLocalModelPath(path: String) {
+        mutableState.update { it.copy(customLocalModelPath = path) }
+        scheduleSave()
+    }
+
+    fun updateCustomEndpoint(endpoint: String) {
+        mutableState.update { it.copy(customEndpoint = endpoint) }
+        scheduleSave()
+    }
+
+    fun updateCustomModelName(modelName: String) {
+        mutableState.update { it.copy(customModelName = modelName) }
+        scheduleSave()
+    }
+
+    fun updateOfflineOnly(offlineOnly: Boolean) {
+        mutableState.update { it.copy(offlineOnly = offlineOnly) }
+        scheduleSave()
+    }
+
     private fun scheduleSave() {
         if (!state.value.isLoaded) {
             return
@@ -68,6 +106,11 @@ class SettingsViewModel @Inject constructor(
                     voice = current.voice,
                     speechRate = current.speechRate,
                     style = current.style,
+                    personalizationProviderType = current.personalizationProviderType.name,
+                    customLocalModelPath = current.customLocalModelPath,
+                    customEndpoint = current.customEndpoint,
+                    customModelName = current.customModelName,
+                    offlineOnly = current.offlineOnly,
                 ),
             )
         }

@@ -2,6 +2,7 @@ package com.vodr.generate
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vodr.ai.PersonalizationPreferences
 import com.vodr.playback.PlaybackChapter
 import java.io.InputStream
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,6 +30,7 @@ class GenerationViewModel(
     fun generate(
         document: GenerationDocumentInput,
         mode: GenerationMode,
+        personalizationPreferences: PersonalizationPreferences = PersonalizationPreferences(),
         openInputStream: suspend (GenerationDocumentInput) -> InputStream?,
     ) {
         viewModelScope.launch {
@@ -47,6 +49,7 @@ class GenerationViewModel(
                         orchestrator.buildPlaybackQueue(
                             document = document,
                             mode = mode,
+                            personalizationPreferences = personalizationPreferences,
                             inputStream = it,
                         )
                     }

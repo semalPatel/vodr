@@ -1,0 +1,157 @@
+package com.vodr.playback
+
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+@Singleton
+class ForegroundVodrPlayerController @Inject constructor(
+    @ApplicationContext private val applicationContext: Context,
+) : VodrPlayerController {
+    private val mutableState = MutableStateFlow(PlaybackState())
+    override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()
+
+    override fun updateQueue(
+        queue: List<PlaybackChapter>,
+        currentChapterIndex: Int,
+        resumePositionMs: Long,
+    ) {
+        mutableState.update { current ->
+            current.copy(
+                queue = queue,
+                currentChapterIndex = clampChapterIndex(queue, currentChapterIndex),
+                resumePositionMs = resumePositionMs.coerceAtLeast(0L),
+                errorMessage = null,
+            )
+        }
+        dispatchAction(VodrPlaybackService.ACTION_SYNC_QUEUE)
+    }
+
+    override fun play() {
+        dispatchForegroundAction(VodrPlaybackService.ACTION_PLAY)
+    }
+
+    override fun pause() {
+        dispatchAction(VodrPlaybackService.ACTION_PAUSE)
+    }
+
+    override fun goToNextChapter() {
+        dispatchAction(VodrPlaybackService.ACTION_NEXT)
+    }
+
+    override fun goToPreviousChapter() {
+        dispatchAction(VodrPlaybackService.ACTION_PREVIOUS)
+    }
+
+    override fun seekForward(incrementMs: Long) {
+        dispatchAction(
+            action = VodrPlaybackService.ACTION_SEEK_FORWARD,
+            extraName = VodrPlaybackService.EXTRA_SEEK_INCREMENT_MS,
+            longValue = incrementMs,
+        )
+    }
+
+    override fun seekBackward(incrementMs: Long) {
+        dispatchAction(
+            action = VodrPlaybackService.ACTION_SEEK_BACKWARD,
+            extraName = VodrPlaybackService.EXTRA_SEEK_INCREMENT_MS,
+            longValue = incrementMs,
+        )
+    }
+
+    override fun updateResumePosition(resumePositionMs: Long) {
+        dispatchAction(
+            action = VodrPlaybackService.ACTION_SEEK_TO_POSITION,
+            extraName = VodrPlaybackService.EXTRA_RESUME_POSITION_MS,
+            longValue = resumePositionMs,
+        )
+    }
+
+    override fun setPlaybackSpeed(playbackSpeed: Float) {
+        dispatchAction(
+            action = VodrPlaybackService.ACTION_SET_SPEED,
+            extraName = VodrPlaybackService.EXTRA_PLAYBACK_SPEED,
+            floatValue = playbackSpeed,
+        )
+    }
+
+    override fun selectChapter(chapterIndex: Int) {
+        dispatchAction(
+            action = VodrPlaybackService.ACTION_SELECT_CHAPTER,
+            extraName = VodrPlaybackService.EXTRA_CHAPTER_INDEX,
+            intValue = chapterIndex,
+        )
+    }
+
+    internal fun snapshot(): PlaybackState = state.value
+
+    internal fun updateFromService(state: PlaybackState) {
+        mutableState.value = state
+    }
+
+    private fun dispatchForegroundAction(action: String) {
+        ContextCompat.startForegroundService(
+            applicationContext,
+            baseIntent(action),
+        )
+    }
+
+    private fun dispatchAction(
+        action: String,
+        extraName: String? = null,
+        intValue: Int? = null,
+        longValue: Long? = null,
+        floatValue: Float? = null,
+    ) {
+        val intent = baseIntent(action).apply {
+            if (extraName != null && intValue != null) {
+                putExtra(extraName, intValue)
+            }
+            if (extraName != null && longValue != null) {
+                putExtra(extraName, longValue)
+            }
+            if (extraName != null && floatValue != null) {
+                putExtra(extraName, floatValue)
+            }
+        }
+        applicationContext.startService(intent)
+    }
+
+    private fun baseIntent(action: String): Intent {
+        return Intent(applicationContext, VodrPlaybackService::class.java).apply {
+            this.action = action
+        }
+    }
+
+    private fun clampChapterIndex(
+        queue: List<PlaybackChapter>,
+        chapterIndex: Int,
+    ): Int {
+        return if (queue.isEmpty()) {
+            0
+        } else {
+            chapterIndex.coerceIn(0, queue.lastIndex)
+        }
+    }
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+internal abstract class PlaybackControllerModule {
+    @Binds
+    @Singleton
+    abstract fun bindVodrPlayerController(
+        implementation: ForegroundVodrPlayerController,
+    ): VodrPlayerController
+}

@@ -11,6 +11,8 @@ import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.vodr.ai.CustomProviderConfig
+import com.vodr.ai.PersonalizationPreferences
 import com.vodr.generate.GenerationDocumentInput
 import com.vodr.generate.GenerationViewModel
 import com.vodr.generate.ui.GenerateScreen
@@ -18,6 +20,8 @@ import com.vodr.generate.ui.GenerationSourceDocument
 import com.vodr.library.LibraryViewModel
 import com.vodr.library.ui.LibraryScreen
 import com.vodr.library.settings.SettingsScreen
+import com.vodr.library.settings.SettingsUiState
+import com.vodr.library.settings.SettingsViewModel
 import com.vodr.player.ui.PlayerScreen
 
 sealed interface VodrRoute {
@@ -55,6 +59,8 @@ fun VodrNavHost(
     val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
     val generationViewModel: GenerationViewModel = viewModel()
     val generationState by generationViewModel.state.collectAsStateWithLifecycle()
+    val settingsViewModel: SettingsViewModel = viewModel()
+    val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
 
     NavHost(
         navController = navController,
@@ -91,6 +97,7 @@ fun VodrNavHost(
                             mimeType = imported.metadata.mimeType,
                         ),
                         mode = mode,
+                        personalizationPreferences = settingsState.toPersonalizationPreferences(),
                         openInputStream = { input ->
                             val uri = Uri.parse(input.sourceUri)
                             context.contentResolver.openInputStream(uri)
@@ -106,7 +113,19 @@ fun VodrNavHost(
             PlayerScreen(queue = generationState.queue)
         }
         composable(VodrRoute.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(viewModel = settingsViewModel)
         }
     }
+}
+
+private fun SettingsUiState.toPersonalizationPreferences(): PersonalizationPreferences {
+    return PersonalizationPreferences(
+        providerType = personalizationProviderType,
+        customProviderConfig = CustomProviderConfig(
+            localModelPath = customLocalModelPath,
+            localEndpoint = customEndpoint,
+            modelName = customModelName,
+        ),
+        offlineOnly = offlineOnly,
+    )
 }

@@ -1,8 +1,12 @@
 package com.vodr.generate
 
 import com.vodr.ai.DefaultDeviceCapabilityDetector
+import com.vodr.ai.PersonalizationPreferences
 import com.vodr.ai.PersonalizationRouter
 import com.vodr.ai.provider.AICorePersonalizer
+import com.vodr.ai.provider.CustomEndpointPersonalizer
+import com.vodr.ai.provider.CustomLocalModelPersonalizer
+import com.vodr.ai.provider.HeuristicPersonalizer
 import com.vodr.ai.provider.MediaPipePersonalizer
 import com.vodr.parser.DocumentParser
 import com.vodr.playback.PlaybackChapter
@@ -24,11 +28,15 @@ class GenerationOrchestrator(
         deviceCapabilityDetector = DefaultDeviceCapabilityDetector(),
         aICorePersonalizer = AICorePersonalizer(),
         mediaPipePersonalizer = MediaPipePersonalizer(),
+        customLocalModelPersonalizer = CustomLocalModelPersonalizer(),
+        customEndpointPersonalizer = CustomEndpointPersonalizer(),
+        heuristicPersonalizer = HeuristicPersonalizer(),
     ),
 ) {
     fun buildPlaybackQueue(
         document: GenerationDocumentInput,
         mode: GenerationMode,
+        personalizationPreferences: PersonalizationPreferences = PersonalizationPreferences(),
         inputStream: InputStream,
     ): List<PlaybackChapter> {
         val parsed = parser.parse(
@@ -43,7 +51,9 @@ class GenerationOrchestrator(
             documentId = document.id,
             chapters = chapterTexts,
         )
-        val promptBuilder = personalizationRouter.select()
+        val promptBuilder = personalizationRouter.select(
+            preferences = personalizationPreferences,
+        )
         return chapterTexts.indices.map { chapterIndex ->
             val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
             val chapterPreview = chapterTexts[chapterIndex].take(60)

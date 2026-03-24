@@ -2,6 +2,7 @@ package com.vodr.library.settings
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.vodr.ai.PersonalizationProviderType
 import com.vodr.data.db.VodrDatabase
 import com.vodr.data.db.entity.UserSettingsEntity
 import org.junit.After
@@ -43,6 +44,11 @@ class SettingsPersistenceTest {
             voice = "narrator",
             speechRate = 1.25f,
             style = "warm",
+            personalizationProviderType = PersonalizationProviderType.CUSTOM_LOCAL_MODEL.name,
+            customLocalModelPath = "/tmp/model.gguf",
+            customEndpoint = "http://localhost:11434",
+            customModelName = "my-model",
+            offlineOnly = true,
         )
 
         repository.save(updatedSettings)
@@ -54,6 +60,19 @@ class SettingsPersistenceTest {
         assertEquals("narrator", requestPayload.voice)
         assertEquals(1.25f, requestPayload.speechRate, 0.0f)
         assertEquals("warm", requestPayload.style)
+        assertEquals(
+            PersonalizationProviderType.CUSTOM_LOCAL_MODEL,
+            requestPayload.personalizationPreferences.providerType,
+        )
+        assertEquals(
+            "/tmp/model.gguf",
+            requestPayload.personalizationPreferences.customProviderConfig.localModelPath,
+        )
+        assertEquals(
+            "my-model",
+            requestPayload.personalizationPreferences.customProviderConfig.modelName,
+        )
+        assertEquals(true, requestPayload.personalizationPreferences.offlineOnly)
         }
     }
 }

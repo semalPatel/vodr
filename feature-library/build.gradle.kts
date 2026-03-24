@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.hilt.android)
+    implementation(project(":core-ai"))
     implementation(project(":core-data"))
 
     kapt(libs.hilt.android.compiler)

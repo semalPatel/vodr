@@ -1,6 +1,5 @@
 package com.vodr.player.ui
 
-import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -18,22 +20,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.playback.PlaybackChapter
+import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
-import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,46 +42,22 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
-    var isTtsReady by remember { mutableStateOf(false) }
-    var isSpeaking by remember { mutableStateOf(false) }
-
     LaunchedEffect(queue) {
         if (queue.isNotEmpty()) {
             viewModel.updateQueue(queue)
         }
     }
+
     val state = viewModel.state.collectAsStateWithLifecycle().value
-    val currentChapter = state.queue.getOrNull(state.currentChapterIndex)
+    val currentChapter = state.currentChapter
     val chapterProgress = if (state.queue.isEmpty()) {
         0f
     } else {
         (state.currentChapterIndex + 1).toFloat() / state.queue.size.toFloat()
     }
-
-    LaunchedEffect(currentChapter?.id) {
-        textToSpeech?.stop()
-        isSpeaking = false
-    }
-
-    DisposableEffect(context) {
-        var tts: TextToSpeech? = null
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts?.language = Locale.getDefault()
-                isTtsReady = true
-            }
-        }
-        textToSpeech = tts
-        onDispose {
-            textToSpeech?.stop()
-            textToSpeech?.shutdown()
-            textToSpeech = null
-            isSpeaking = false
-            isTtsReady = false
-        }
-    }
+    val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
+        state.playbackStatus == PlaybackStatus.PREPARING
+    var isChapterMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -111,11 +87,13 @@ fun PlayerScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(text = if (isTtsReady) "Voice Ready" else "Preparing Voice") },
+                        label = {
+                            Text(text = if (state.isVoiceReady) "Voice Ready" else "Preparing Voice")
+                        },
                     )
                     AssistChip(
                         onClick = {},
-                        label = { Text(text = if (isSpeaking) "Speaking" else "Idle") },
+                        label = { Text(text = state.playbackStatus.toReadableLabel()) },
                     )
                 }
                 Text(
@@ -126,39 +104,96 @@ fun PlayerScreen(
                     text = currentChapter?.title ?: "No generated chapter yet.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Row {
-                    Button(onClick = viewModel::goToPreviousChapter) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        enabled = currentChapter != null,
+                        onClick = viewModel::goToPreviousChapter,
+                    ) {
                         Text(text = "Prev")
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Button(onClick = viewModel::goToNextChapter) {
+                    Button(
+                        enabled = currentChapter != null,
+                        onClick = viewModel::goToNextChapter,
+                    ) {
                         Text(text = "Next")
                     }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        enabled = currentChapter != null,
+                        onClick = viewModel::seekBackward,
+                    ) {
+                        Text(text = "-15s")
+                    }
+                    Button(
+                        enabled = currentChapter != null,
+                        onClick = { isChapterMenuExpanded = true },
+                    ) {
+                        Text(text = "Chapters")
+                    }
+                    DropdownMenu(
+                        expanded = isChapterMenuExpanded,
+                        onDismissRequest = { isChapterMenuExpanded = false },
+                    ) {
+                        state.queue.forEachIndexed { index, chapter ->
+                            DropdownMenuItem(
+                                text = { Text(text = chapter.title) },
+                                onClick = {
+                                    isChapterMenuExpanded = false
+                                    viewModel.selectChapter(index)
+                                },
+                            )
+                        }
+                    }
+                    Button(
+                        enabled = currentChapter != null,
+                        onClick = viewModel::seekForward,
+                    ) {
+                        Text(text = "+15s")
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
+                        FilterChip(
+                            selected = state.playbackSpeed == speed,
+                            onClick = {
+                                viewModel.updatePlaybackSpeed(speed)
+                            },
+                            label = { Text(text = "${speed}x") },
+                        )
+                    }
+                }
                 Button(
-                    enabled = currentChapter != null && isTtsReady,
+                    enabled = currentChapter != null && state.isVoiceReady,
                     modifier = Modifier.semantics {
-                        contentDescription = if (isSpeaking) {
+                        contentDescription = if (isPlaying) {
                             "Pause narration"
                         } else {
                             "Start narration"
                         }
                     },
-                    onClick = {
-                        val chapter = currentChapter ?: return@Button
-                        val tts = textToSpeech ?: return@Button
-                        if (isSpeaking) {
-                            tts.stop()
-                            isSpeaking = false
-                        } else {
-                            tts.speak(chapter.text, TextToSpeech.QUEUE_FLUSH, null, chapter.id)
-                            isSpeaking = true
-                        }
-                    },
+                    onClick = viewModel::togglePlayback,
                 ) {
-                    Text(text = if (isSpeaking) "Pause Narration" else "Play Narration")
+                    Text(text = if (isPlaying) "Pause Narration" else "Play Narration")
+                }
+                state.errorMessage?.let { errorMessage ->
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         }
+    }
+}
+
+private fun PlaybackStatus.toReadableLabel(): String {
+    return when (this) {
+        PlaybackStatus.IDLE -> "Idle"
+        PlaybackStatus.PREPARING -> "Preparing"
+        PlaybackStatus.PLAYING -> "Speaking"
+        PlaybackStatus.PAUSED -> "Paused"
+        PlaybackStatus.ERROR -> "Error"
     }
 }

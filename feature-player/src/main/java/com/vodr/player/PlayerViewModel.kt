@@ -1,63 +1,61 @@
 package com.vodr.player
 
 import androidx.lifecycle.ViewModel
-import com.vodr.playback.InMemoryVodrPlayerController
 import com.vodr.playback.PlaybackChapter
+import com.vodr.playback.PlaybackState
 import com.vodr.playback.VodrPlayerController
-import kotlinx.coroutines.flow.MutableStateFlow
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
-data class PlayerUiState(
-    val queue: List<PlaybackChapter> = emptyList(),
-    val currentChapterIndex: Int = 0,
-    val resumePositionMs: Long = 0L,
-)
-
-class PlayerViewModel(
-    private val controller: VodrPlayerController = InMemoryVodrPlayerController(),
+@HiltViewModel
+class PlayerViewModel @Inject constructor(
+    private val controller: VodrPlayerController,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(PlayerUiState())
-    val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
+    val state: StateFlow<PlaybackState> = controller.state
 
     fun updateQueue(queue: List<PlaybackChapter>) {
-        val clampedIndex = if (queue.isEmpty()) {
-            0
-        } else {
-            state.value.currentChapterIndex.coerceIn(0, queue.lastIndex)
-        }
-        mutableState.update {
-            it.copy(
-            queue = queue,
-            currentChapterIndex = clampedIndex,
-            )
-        }
         controller.updateQueue(
             queue = queue,
-            currentChapterIndex = clampedIndex,
+            currentChapterIndex = state.value.currentChapterIndex,
             resumePositionMs = state.value.resumePositionMs,
         )
     }
 
-    fun goToNextChapter() {
-        if (state.value.currentChapterIndex < state.value.queue.lastIndex) {
-            val nextIndex = state.value.currentChapterIndex + 1
-            mutableState.update { it.copy(currentChapterIndex = nextIndex) }
-            controller.goToNextChapter()
+    fun togglePlayback() {
+        when (state.value.playbackStatus) {
+            com.vodr.playback.PlaybackStatus.PLAYING,
+            com.vodr.playback.PlaybackStatus.PREPARING,
+            -> controller.pause()
+            else -> controller.play()
         }
+    }
+
+    fun goToNextChapter() {
+        controller.goToNextChapter()
     }
 
     fun goToPreviousChapter() {
-        if (state.value.currentChapterIndex > 0) {
-            val previousIndex = state.value.currentChapterIndex - 1
-            mutableState.update { it.copy(currentChapterIndex = previousIndex) }
-            controller.goToPreviousChapter()
-        }
+        controller.goToPreviousChapter()
+    }
+
+    fun seekForward() {
+        controller.seekForward()
+    }
+
+    fun seekBackward() {
+        controller.seekBackward()
     }
 
     fun updateResumePosition(resumePositionMs: Long) {
-        mutableState.update { it.copy(resumePositionMs = resumePositionMs) }
         controller.updateResumePosition(resumePositionMs)
+    }
+
+    fun updatePlaybackSpeed(playbackSpeed: Float) {
+        controller.setPlaybackSpeed(playbackSpeed)
+    }
+
+    fun selectChapter(chapterIndex: Int) {
+        controller.selectChapter(chapterIndex)
     }
 }

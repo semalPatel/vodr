@@ -1,5 +1,8 @@
 package com.vodr.library.settings
 
+import com.vodr.ai.CustomProviderConfig
+import com.vodr.ai.PersonalizationPreferences
+import com.vodr.ai.PersonalizationProviderType
 import com.vodr.data.db.dao.UserSettingsDao
 import com.vodr.data.db.entity.UserSettingsEntity
 import javax.inject.Inject
@@ -11,6 +14,7 @@ data class GenerationRequestPayload(
     val voice: String,
     val speechRate: Float,
     val style: String,
+    val personalizationPreferences: PersonalizationPreferences,
 )
 
 @Singleton
@@ -36,5 +40,19 @@ fun UserSettingsEntity.toGenerationRequestPayload(): GenerationRequestPayload {
         voice = voice,
         speechRate = speechRate,
         style = style,
+        personalizationPreferences = PersonalizationPreferences(
+            providerType = personalizationProviderType.toPersonalizationProviderType(),
+            customProviderConfig = CustomProviderConfig(
+                localModelPath = customLocalModelPath,
+                localEndpoint = customEndpoint,
+                modelName = customModelName,
+            ),
+            offlineOnly = offlineOnly,
+        ),
     )
+}
+
+fun String.toPersonalizationProviderType(): PersonalizationProviderType {
+    return runCatching { PersonalizationProviderType.valueOf(this) }
+        .getOrDefault(PersonalizationProviderType.AUTO)
 }
