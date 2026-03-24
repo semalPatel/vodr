@@ -17,6 +17,10 @@ data class DocumentEntity(
     val documentId: Long = 0L,
     val title: String,
     val sourceUri: String,
+    val mimeType: String = "application/pdf",
+    val byteCount: Long? = null,
+    val lastModifiedEpochMs: Long? = null,
+    val importedAtEpochMs: Long = 0L,
     val createdAtEpochMs: Long,
     val updatedAtEpochMs: Long,
 )

@@ -1,14 +1,17 @@
 package com.vodr.library
 
-class ImportDocumentUseCase(
-    private val repository: DocumentMetadataRepository = InMemoryDocumentMetadataRepository(),
-    private val acceptedMimeTypes: Set<String> = setOf("application/pdf", "application/epub+zip"),
+import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+
+class ImportDocumentUseCase @Inject constructor(
+    private val repository: DocumentMetadataRepository,
 ) {
+    private val acceptedMimeTypes: Set<String> = SUPPORTED_MIME_TYPES
     val supportedMimeTypes: Set<String> = acceptedMimeTypes
 
     fun isSupportedMimeType(mimeType: String): Boolean = mimeType in acceptedMimeTypes
 
-    fun importDocument(
+    suspend fun importDocument(
         request: ImportDocumentRequest,
         currentTimeEpochMs: Long = System.currentTimeMillis(),
     ): ImportedDocument {
@@ -26,5 +29,11 @@ class ImportDocumentUseCase(
         )
 
         return repository.save(metadata)
+    }
+
+    fun observeDocuments(): Flow<List<ImportedDocument>> = repository.observeAll()
+
+    companion object {
+        private val SUPPORTED_MIME_TYPES = setOf("application/pdf", "application/epub+zip")
     }
 }

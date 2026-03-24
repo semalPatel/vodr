@@ -22,25 +22,31 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vodr.library.ImportDocumentRequest
-import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun LibraryScreen(
-    viewModel: LibraryViewModel = remember { LibraryViewModel() },
-    onDocumentImported: (ImportedDocument) -> Unit = {},
+    viewModel: LibraryViewModel,
     onOpenGenerate: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val state = viewModel.state
+    val state = viewModel.state.collectAsStateWithLifecycle().value
+    LaunchedEffect(state.lastImportedDocumentId) {
+        if (state.lastImportedDocumentId != null) {
+            onOpenGenerate()
+            viewModel.consumeLastImportedDocument()
+        }
+    }
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -77,11 +83,7 @@ fun LibraryScreen(
             lastModifiedEpochMs = null,
         )
         if (request != null) {
-            val imported = viewModel.importDocument(request = request)
-            if (imported != null) {
-                onDocumentImported(imported)
-                onOpenGenerate()
-            }
+            viewModel.importDocument(request = request)
         } else {
             viewModel.reportUnsupportedSelection()
         }
@@ -112,6 +114,7 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Button(
+                    enabled = !state.isImporting,
                     onClick = {
                         openDocumentLauncher.launch(
                             arrayOf(
@@ -121,7 +124,7 @@ fun LibraryScreen(
                         )
                     },
                 ) {
-                    Text(text = "Import PDF/EPUB")
+                    Text(text = if (state.isImporting) "Importing..." else "Import PDF/EPUB")
                 }
                 if (state.errorMessage != null) {
                     Text(text = state.errorMessage)

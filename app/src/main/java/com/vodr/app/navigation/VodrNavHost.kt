@@ -3,8 +3,6 @@ package com.vodr.app.navigation
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -16,7 +14,7 @@ import com.vodr.generate.GenerationDocumentInput
 import com.vodr.generate.GenerationViewModel
 import com.vodr.generate.ui.GenerateScreen
 import com.vodr.generate.ui.GenerationSourceDocument
-import com.vodr.library.ImportedDocument
+import com.vodr.library.LibraryViewModel
 import com.vodr.library.ui.LibraryScreen
 import com.vodr.library.settings.SettingsScreen
 import com.vodr.player.ui.PlayerScreen
@@ -36,7 +34,8 @@ fun VodrNavHost(
     navController: NavHostController = rememberNavController(),
 ) {
     val context = LocalContext.current
-    val importedDocuments = remember { mutableStateListOf<ImportedDocument>() }
+    val libraryViewModel: LibraryViewModel = viewModel()
+    val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
     val generationViewModel: GenerationViewModel = viewModel()
     val generationState by generationViewModel.state.collectAsStateWithLifecycle()
 
@@ -46,9 +45,7 @@ fun VodrNavHost(
     ) {
         composable(VodrNavRoutes.libraryRoute) {
             LibraryScreen(
-                onDocumentImported = { document ->
-                    importedDocuments.add(document)
-                },
+                viewModel = libraryViewModel,
                 onOpenGenerate = {
                     navController.navigate(VodrNavRoutes.generateRoute)
                 },
@@ -60,14 +57,14 @@ fun VodrNavHost(
         composable(VodrNavRoutes.generateRoute) {
             GenerateScreen(
                 generationState = generationState,
-                documents = importedDocuments.map {
+                documents = libraryState.documents.map {
                     GenerationSourceDocument(
                         id = it.id.toString(),
                         displayName = it.metadata.displayName,
                     )
                 },
                 onGenerateRequested = { documentId, mode ->
-                    val imported = importedDocuments.firstOrNull { it.id.toString() == documentId }
+                    val imported = libraryState.documents.firstOrNull { it.id.toString() == documentId }
                         ?: return@GenerateScreen
                     generationViewModel.generate(
                         document = GenerationDocumentInput(

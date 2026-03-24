@@ -4,19 +4,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.runBlocking
 
 class ImportDocumentUseCaseTest {
 
     private class FakeDocumentMetadataRepository : DocumentMetadataRepository {
         var savedMetadata: DocumentMetadata? = null
 
-        override fun save(metadata: DocumentMetadata): ImportedDocument {
+        override suspend fun save(metadata: DocumentMetadata): ImportedDocument {
             savedMetadata = metadata
             return ImportedDocument(
                 id = 42L,
                 metadata = metadata,
             )
         }
+
+        override fun observeAll(): Flow<List<ImportedDocument>> = emptyFlow()
     }
 
     @Test
@@ -34,6 +39,7 @@ class ImportDocumentUseCaseTest {
 
     @Test
     fun importDocumentPersistsMetadata() {
+        runBlocking {
         val repository = FakeDocumentMetadataRepository()
         val useCase = ImportDocumentUseCase(repository = repository)
         val request = ImportDocumentRequest(
@@ -54,5 +60,6 @@ class ImportDocumentUseCaseTest {
         assertEquals(1_700_000_000_999L, repository.savedMetadata?.importedAtEpochMs)
         assertEquals(42L, result.id)
         assertEquals(repository.savedMetadata, result.metadata)
+        }
     }
 }

@@ -12,6 +12,7 @@ import org.junit.Test
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -36,14 +37,16 @@ class VodrDatabaseTest {
 
     @Test
     fun insertAndReadDocument() {
+        runBlocking {
         val document = DocumentEntity(
             title = "Sample document",
             sourceUri = "file:///tmp/sample.pdf",
+            importedAtEpochMs = 1_700_000_000_000,
             createdAtEpochMs = 1_700_000_000_000,
             updatedAtEpochMs = 1_700_000_000_123,
         )
 
-        val documentId = database.documentDao().insert(document)
+        val documentId = database.documentDao().upsert(document)
         val readBack = database.documentDao().getById(documentId)
 
         assertNotNull(readBack)
@@ -51,14 +54,17 @@ class VodrDatabaseTest {
         assertEquals(document.sourceUri, readBack?.sourceUri)
         assertEquals(document.createdAtEpochMs, readBack?.createdAtEpochMs)
         assertEquals(document.updatedAtEpochMs, readBack?.updatedAtEpochMs)
+        }
     }
 
     @Test
     fun insertAndReadChunk() {
-        val documentId = database.documentDao().insert(
+        runBlocking {
+        val documentId = database.documentDao().upsert(
             DocumentEntity(
                 title = "Sample document",
                 sourceUri = "file:///tmp/sample.pdf",
+                importedAtEpochMs = 1_700_000_000_000,
                 createdAtEpochMs = 1_700_000_000_000,
                 updatedAtEpochMs = 1_700_000_000_123,
             )
@@ -90,5 +96,6 @@ class VodrDatabaseTest {
         assertEquals(chunk.text, readBack?.text)
         assertEquals(chunk.startOffset, readBack?.startOffset)
         assertEquals(chunk.endOffset, readBack?.endOffset)
+        }
     }
 }

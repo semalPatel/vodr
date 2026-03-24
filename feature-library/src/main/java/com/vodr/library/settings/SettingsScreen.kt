@@ -155,7 +155,9 @@ private fun rememberSettingsRepository(): SettingsRepository {
             context,
             VodrDatabase::class.java,
             SETTINGS_DATABASE_NAME,
-        ).build()
+        )
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
         SettingsRepository(database.userSettingsDao())
     }
 }
