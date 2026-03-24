@@ -26,7 +26,7 @@ class PersonalizationRouter(
     fun select(
         preferences: PersonalizationPreferences = PersonalizationPreferences(),
     ): Personalizer {
-        val candidates = candidateProviders(preferences)
+        val candidates = personalizationCandidateProviders(preferences)
         return candidates.firstNotNullOfOrNull { providerType ->
             val result = probeRegistry.probe(
                 providerType = providerType,
@@ -38,54 +38,6 @@ class PersonalizationRouter(
                 null
             }
         } ?: heuristicPersonalizer
-    }
-
-    private fun candidateProviders(
-        preferences: PersonalizationPreferences,
-    ): List<PersonalizationProviderType> {
-        return when (preferences.providerType) {
-            PersonalizationProviderType.AUTO -> buildList {
-                if (preferences.customProviderConfig.localModelPath.isNotBlank()) {
-                    add(PersonalizationProviderType.CUSTOM_LOCAL_MODEL)
-                }
-                add(PersonalizationProviderType.AI_CORE)
-                add(PersonalizationProviderType.MEDIA_PIPE)
-                if (!preferences.offlineOnly &&
-                    preferences.customProviderConfig.localEndpoint.isNotBlank()
-                ) {
-                    add(PersonalizationProviderType.CUSTOM_ENDPOINT)
-                }
-                add(PersonalizationProviderType.OFFLINE_HEURISTIC)
-            }
-            PersonalizationProviderType.AI_CORE -> listOf(
-                PersonalizationProviderType.AI_CORE,
-                PersonalizationProviderType.MEDIA_PIPE,
-                PersonalizationProviderType.OFFLINE_HEURISTIC,
-            )
-            PersonalizationProviderType.MEDIA_PIPE -> listOf(
-                PersonalizationProviderType.MEDIA_PIPE,
-                PersonalizationProviderType.AI_CORE,
-                PersonalizationProviderType.OFFLINE_HEURISTIC,
-            )
-            PersonalizationProviderType.CUSTOM_LOCAL_MODEL -> listOf(
-                PersonalizationProviderType.CUSTOM_LOCAL_MODEL,
-                PersonalizationProviderType.AI_CORE,
-                PersonalizationProviderType.MEDIA_PIPE,
-                PersonalizationProviderType.OFFLINE_HEURISTIC,
-            )
-            PersonalizationProviderType.CUSTOM_ENDPOINT -> buildList {
-                add(PersonalizationProviderType.CUSTOM_ENDPOINT)
-                if (preferences.customProviderConfig.localModelPath.isNotBlank()) {
-                    add(PersonalizationProviderType.CUSTOM_LOCAL_MODEL)
-                }
-                add(PersonalizationProviderType.AI_CORE)
-                add(PersonalizationProviderType.MEDIA_PIPE)
-                add(PersonalizationProviderType.OFFLINE_HEURISTIC)
-            }
-            PersonalizationProviderType.OFFLINE_HEURISTIC -> listOf(
-                PersonalizationProviderType.OFFLINE_HEURISTIC,
-            )
-        }
     }
 
     private fun personalizerFor(
@@ -104,5 +56,10 @@ class PersonalizationRouter(
 }
 
 interface Personalizer {
-    fun buildPrompt(inputText: String, tone: String, style: String): String
+    fun buildPrompt(
+        inputText: String,
+        tone: String,
+        style: String,
+        customProviderConfig: CustomProviderConfig = CustomProviderConfig(),
+    ): String
 }

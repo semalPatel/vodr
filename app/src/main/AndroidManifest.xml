@@ -1,9 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".VodrApplication"
+        android:usesCleartextTraffic="true"
         android:label="Vodr">
         <activity
             android:name=".MainActivity"

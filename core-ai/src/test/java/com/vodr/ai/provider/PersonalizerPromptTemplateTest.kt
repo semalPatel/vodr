@@ -1,5 +1,6 @@
 package com.vodr.ai.provider
 
+import com.vodr.ai.CustomProviderConfig
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -11,6 +12,7 @@ class PersonalizerPromptTemplateTest {
             inputText = "  Rewrite this  ",
             tone = "  Friendly   Professional ",
             style = "  Short Form ",
+            customProviderConfig = CustomProviderConfig(),
         )
 
         assertEquals(

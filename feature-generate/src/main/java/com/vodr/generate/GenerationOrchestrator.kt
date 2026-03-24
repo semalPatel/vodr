@@ -1,8 +1,15 @@
 package com.vodr.generate
 
 import com.vodr.ai.DefaultDeviceCapabilityDetector
+import com.vodr.ai.OfflineHeuristicRuntimeProbe
 import com.vodr.ai.PersonalizationPreferences
+import com.vodr.ai.PersonalizationProbeRegistry
 import com.vodr.ai.PersonalizationRouter
+import com.vodr.ai.MediaPipeRuntimeProbe
+import com.vodr.ai.AICoreRuntimeProbe
+import com.vodr.ai.CustomEndpointRuntimeProbe
+import com.vodr.ai.CustomLocalModelRuntimeProbe
+import com.vodr.ai.TranscriptionRouter
 import com.vodr.ai.provider.AICorePersonalizer
 import com.vodr.ai.provider.CustomEndpointPersonalizer
 import com.vodr.ai.provider.CustomLocalModelPersonalizer
@@ -24,13 +31,27 @@ data class GenerationDocumentInput(
 class GenerationOrchestrator(
     private val parser: DocumentParser = DocumentParser(),
     private val segmenter: Segmenter = Segmenter(policy = ChunkPolicy(maxCharsPerChunk = 400)),
+    private val deviceCapabilityDetector: DefaultDeviceCapabilityDetector = DefaultDeviceCapabilityDetector(),
+    private val probeRegistry: PersonalizationProbeRegistry = PersonalizationProbeRegistry(
+        probes = listOf(
+            AICoreRuntimeProbe(deviceCapabilityDetector),
+            MediaPipeRuntimeProbe(deviceCapabilityDetector),
+            CustomLocalModelRuntimeProbe(),
+            CustomEndpointRuntimeProbe(),
+            OfflineHeuristicRuntimeProbe(),
+        ),
+    ),
     private val personalizationRouter: PersonalizationRouter = PersonalizationRouter(
-        deviceCapabilityDetector = DefaultDeviceCapabilityDetector(),
+        deviceCapabilityDetector = deviceCapabilityDetector,
         aICorePersonalizer = AICorePersonalizer(),
         mediaPipePersonalizer = MediaPipePersonalizer(),
         customLocalModelPersonalizer = CustomLocalModelPersonalizer(),
         customEndpointPersonalizer = CustomEndpointPersonalizer(),
         heuristicPersonalizer = HeuristicPersonalizer(),
+        probeRegistry = probeRegistry,
+    ),
+    private val transcriptionRouter: TranscriptionRouter = TranscriptionRouter(
+        probeRegistry = probeRegistry,
     ),
 ) {
     fun buildPlaybackQueue(
@@ -54,6 +75,9 @@ class GenerationOrchestrator(
         val promptBuilder = personalizationRouter.select(
             preferences = personalizationPreferences,
         )
+        val transcriptionEngine = transcriptionRouter.select(
+            preferences = personalizationPreferences,
+        )
         return chapterTexts.indices.map { chapterIndex ->
             val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
             val chapterPreview = chapterTexts[chapterIndex].take(60)
@@ -61,10 +85,15 @@ class GenerationOrchestrator(
                 inputText = chapterPreview,
                 tone = "neutral",
                 style = mode.name.lowercase(),
+                customProviderConfig = personalizationPreferences.customProviderConfig,
+            )
+            val transcriptLabel = transcriptionEngine.transcribe(
+                sourceText = chapterTexts[chapterIndex].take(240),
+                customProviderConfig = personalizationPreferences.customProviderConfig,
             )
             PlaybackChapter(
                 id = "${document.id}-$chapterIndex",
-                title = "Chapter ${chapterIndex + 1} (${chapterChunkCount} chunks) ${prompt.take(24)}",
+                title = "Chapter ${chapterIndex + 1}: ${transcriptLabel.take(24)} (${chapterChunkCount} chunks) ${prompt.take(16)}",
                 text = chapterTexts[chapterIndex],
             )
         }
