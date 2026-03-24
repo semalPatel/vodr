@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.update
 
 @Singleton
 class ForegroundVodrPlayerController @Inject constructor(
-    @ApplicationContext private val applicationContext: Context,
+    @param:ApplicationContext private val applicationContext: Context,
 ) : VodrPlayerController {
     private val mutableState = MutableStateFlow(PlaybackState())
     override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()

@@ -1,190 +1,241 @@
 package com.vodr.playback
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.os.Build
-import android.os.IBinder
 import android.os.Looper
-import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.SilenceMediaSource
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class VodrPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
+class VodrPlaybackService : MediaSessionService() {
     @Inject
     lateinit var controller: ForegroundVodrPlayerController
 
-    private lateinit var notificationManager: NotificationManager
-    private lateinit var audioManager: AudioManager
-    private lateinit var mediaSession: MediaSessionCompat
-    private var audioFocusRequest: AudioFocusRequest? = null
+    private lateinit var player: ExoPlayer
+    private lateinit var mediaSession: MediaSession
     private var textToSpeech: TextToSpeech? = null
-    private var activeUtteranceId: String? = null
-    private var utteranceStartElapsedRealtimeMs: Long = 0L
-    private var playbackBasePositionMs: Long = 0L
     private var isVoiceReady: Boolean = false
+    private var activeUtteranceId: String? = null
+    private var activeChapterIndex: Int = -1
+    private var activeStartPositionMs: Long = 0L
     private val progressHandler = android.os.Handler(Looper.getMainLooper())
     private val progressUpdater = object : Runnable {
         override fun run() {
-            val snapshot = controller.snapshot()
-            val chapter = snapshot.currentChapter ?: return
-            if (snapshot.playbackStatus != PlaybackStatus.PLAYING) {
-                return
+            syncControllerState()
+            if (player.isPlaying) {
+                progressHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS)
             }
-            val updatedPosition = currentPlaybackPosition(
-                chapter = chapter,
-                playbackSpeed = snapshot.playbackSpeed,
-            )
-            controller.updateFromService(
-                snapshot.copy(
-                    resumePositionMs = updatedPosition,
-                    isVoiceReady = isVoiceReady,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            progressHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS)
         }
     }
-    private val becomingNoisyReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-                pausePlayback()
+    private val playerListener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) {
+            val shouldRestartTts = events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
+                events.contains(Player.EVENT_POSITION_DISCONTINUITY) ||
+                events.contains(Player.EVENT_PLAYBACK_PARAMETERS_CHANGED)
+            if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) {
+                if (player.isPlaying) {
+                    syncTtsWithPlayer(force = true)
+                } else {
+                    stopCurrentUtterance()
+                }
+            } else if (shouldRestartTts && player.isPlaying) {
+                syncTtsWithPlayer(force = true)
             }
+            if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) &&
+                player.playbackState == Player.STATE_ENDED
+            ) {
+                stopCurrentUtterance()
+            }
+            syncControllerState()
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            stopCurrentUtterance()
+            syncControllerState(errorMessage = error.message ?: "Playback failed.")
         }
     }
 
     override fun onCreate() {
         super.onCreate()
-        notificationManager = getSystemService(NotificationManager::class.java)
-        audioManager = getSystemService(AudioManager::class.java)
-        createNotificationChannel()
-        registerBecomingNoisyReceiver()
-        initializeMediaSession()
+        player = ExoPlayer.Builder(this).build().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                    .build(),
+                true,
+            )
+            setHandleAudioBecomingNoisy(true)
+            repeatMode = Player.REPEAT_MODE_OFF
+            addListener(playerListener)
+        }
+        val sessionBuilder = MediaSession.Builder(this, player)
+        sessionActivityPendingIntent()?.let(sessionBuilder::setSessionActivity)
+        mediaSession = sessionBuilder.build()
         initializeTextToSpeech()
-        syncStateWithSession()
+        syncControllerState()
     }
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val commandIntent = intent
         when (commandIntent?.action ?: ACTION_SYNC_QUEUE) {
-            ACTION_SYNC_QUEUE -> syncStateWithSession()
-            ACTION_PLAY -> playCurrentChapter()
-            ACTION_PAUSE -> pausePlayback()
-            ACTION_NEXT -> skipToNext()
-            ACTION_PREVIOUS -> skipToPrevious()
-            ACTION_SEEK_FORWARD -> seekBy(
-                commandIntent?.getLongExtra(
+            ACTION_SYNC_QUEUE -> syncQueueWithPlayer()
+            ACTION_PLAY -> if (player.mediaItemCount > 0) player.play() else syncQueueWithPlayer()
+            ACTION_PAUSE -> player.pause()
+            ACTION_NEXT -> {
+                if (player.hasNextMediaItem()) {
+                    player.seekToNextMediaItem()
+                    if (!player.isPlaying && controller.snapshot().playbackStatus == PlaybackStatus.PLAYING) {
+                        player.play()
+                    }
+                }
+            }
+            ACTION_PREVIOUS -> {
+                if (player.currentPosition > RESTART_THRESHOLD_MS) {
+                    player.seekTo(0L)
+                } else if (player.hasPreviousMediaItem()) {
+                    player.seekToPreviousMediaItem()
+                } else {
+                    player.seekTo(0L)
+                }
+            }
+            ACTION_SEEK_FORWARD -> {
+                val incrementMs = commandIntent?.getLongExtra(
                     EXTRA_SEEK_INCREMENT_MS,
                     PlaybackState.DEFAULT_SEEK_INCREMENT_MS,
                 ) ?: PlaybackState.DEFAULT_SEEK_INCREMENT_MS
-            )
-            ACTION_SEEK_BACKWARD -> seekBy(
-                -(commandIntent?.getLongExtra(
+                player.seekTo(player.currentPosition + incrementMs)
+            }
+            ACTION_SEEK_BACKWARD -> {
+                val incrementMs = commandIntent?.getLongExtra(
                     EXTRA_SEEK_INCREMENT_MS,
                     PlaybackState.DEFAULT_SEEK_INCREMENT_MS,
-                ) ?: PlaybackState.DEFAULT_SEEK_INCREMENT_MS)
-            )
-            ACTION_SEEK_TO_POSITION -> seekTo(
-                commandIntent?.getLongExtra(EXTRA_RESUME_POSITION_MS, 0L) ?: 0L
-            )
-            ACTION_SET_SPEED -> updatePlaybackSpeed(
-                commandIntent?.getFloatExtra(
+                ) ?: PlaybackState.DEFAULT_SEEK_INCREMENT_MS
+                player.seekTo((player.currentPosition - incrementMs).coerceAtLeast(0L))
+            }
+            ACTION_SEEK_TO_POSITION -> {
+                val positionMs = commandIntent?.getLongExtra(EXTRA_RESUME_POSITION_MS, 0L) ?: 0L
+                player.seekTo(positionMs.coerceAtLeast(0L))
+            }
+            ACTION_SET_SPEED -> {
+                val playbackSpeed = commandIntent?.getFloatExtra(
                     EXTRA_PLAYBACK_SPEED,
                     PlaybackState.DEFAULT_PLAYBACK_SPEED,
                 ) ?: PlaybackState.DEFAULT_PLAYBACK_SPEED
-            )
-            ACTION_SELECT_CHAPTER -> selectChapter(
-                commandIntent?.getIntExtra(
+                player.setPlaybackParameters(
+                    PlaybackParameters(playbackSpeed.coerceIn(0.75f, 2.0f)),
+                )
+            }
+            ACTION_SELECT_CHAPTER -> {
+                val chapterIndex = commandIntent?.getIntExtra(
                     EXTRA_CHAPTER_INDEX,
-                    controller.snapshot().currentChapterIndex,
-                ) ?: controller.snapshot().currentChapterIndex
-            )
+                    player.currentMediaItemIndex.coerceAtLeast(0),
+                ) ?: player.currentMediaItemIndex.coerceAtLeast(0)
+                val clampedIndex = chapterIndex.coerceIn(0, (player.mediaItemCount - 1).coerceAtLeast(0))
+                player.seekToDefaultPosition(clampedIndex)
+            }
         }
-        return START_STICKY
+        return super.onStartCommand(intent, flags, startId)
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onAudioFocusChange(focusChange: Int) {
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_LOSS,
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
-            -> pausePlayback()
-            AudioManager.AUDIOFOCUS_GAIN -> Unit
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!player.isPlaying) {
+            stopSelf()
         }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         progressHandler.removeCallbacksAndMessages(null)
-        unregisterReceiver(becomingNoisyReceiver)
-        textToSpeech?.stop()
+        stopCurrentUtterance()
         textToSpeech?.shutdown()
+        player.removeListener(playerListener)
+        player.release()
         mediaSession.release()
-        abandonAudioFocus()
+        super.onDestroy()
     }
 
-    private fun initializeMediaSession() {
-        mediaSession = MediaSessionCompat(this, SESSION_TAG).apply {
-            setCallback(
-                object : MediaSessionCompat.Callback() {
-                    override fun onPlay() = playCurrentChapter()
-
-                    override fun onPause() = pausePlayback()
-
-                    override fun onSkipToNext() = skipToNext()
-
-                    override fun onSkipToPrevious() = skipToPrevious()
-
-                    override fun onSeekTo(pos: Long) = seekTo(pos)
-
-                    override fun onFastForward() = seekBy(PlaybackState.DEFAULT_SEEK_INCREMENT_MS)
-
-                    override fun onRewind() = seekBy(-PlaybackState.DEFAULT_SEEK_INCREMENT_MS)
-                }
-            )
-            isActive = true
+    private fun syncQueueWithPlayer() {
+        val snapshot = controller.snapshot()
+        if (snapshot.queue.isEmpty()) {
+            stopCurrentUtterance()
+            player.clearMediaItems()
+            player.pause()
+            syncControllerState()
+            stopSelf()
+            return
         }
+
+        val mediaSources = snapshot.queue.mapIndexed { index, chapter ->
+            buildSilenceMediaSource(
+                chapter = chapter,
+                chapterIndex = index,
+            )
+        }
+        player.setMediaSources(
+            mediaSources,
+            snapshot.currentChapterIndex.coerceIn(0, snapshot.queue.lastIndex),
+            snapshot.resumePositionMs,
+        )
+        player.prepare()
+        player.setPlaybackParameters(PlaybackParameters(snapshot.playbackSpeed))
+        if (snapshot.playbackStatus == PlaybackStatus.PLAYING ||
+            snapshot.playbackStatus == PlaybackStatus.PREPARING
+        ) {
+            player.play()
+        } else {
+            player.pause()
+        }
+        syncControllerState()
+    }
+
+    private fun buildSilenceMediaSource(
+        chapter: PlaybackChapter,
+        chapterIndex: Int,
+    ): MediaSource {
+        return SilenceMediaSource.Factory()
+            .setDurationUs(PlaybackEstimator.estimatedDurationMs(chapter.text, 1.0f) * 1_000L)
+            .setTag(
+                MediaItem.Builder()
+                    .setMediaId(chapter.id)
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(chapter.title)
+                            .setArtist("Vodr")
+                            .setTrackNumber(chapterIndex + 1)
+                            .build(),
+                    )
+                    .build(),
+            )
+            .createMediaSource()
     }
 
     private fun initializeTextToSpeech() {
         textToSpeech = TextToSpeech(applicationContext) { status ->
-            if (status == TextToSpeech.SUCCESS) {
+            isVoiceReady = status == TextToSpeech.SUCCESS
+            if (isVoiceReady) {
                 textToSpeech?.language = Locale.getDefault()
-                isVoiceReady = true
-                syncStateWithSession()
-            } else {
-                isVoiceReady = false
-                controller.updateFromService(
-                    controller.snapshot().copy(
-                        playbackStatus = PlaybackStatus.ERROR,
-                        errorMessage = "Text-to-speech engine unavailable.",
-                        isVoiceReady = false,
-                    )
-                )
-                updateMediaSessionState(controller.snapshot())
-                updateForegroundNotification(controller.snapshot())
             }
+            syncControllerState(
+                errorMessage = if (isVoiceReady) null else "Text-to-speech engine unavailable.",
+            )
         }.apply {
             setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
@@ -192,17 +243,8 @@ class VodrPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
                         if (utteranceId != activeUtteranceId) {
                             return
                         }
-                        val snapshot = controller.snapshot()
-                        controller.updateFromService(
-                            snapshot.copy(
-                                playbackStatus = PlaybackStatus.PLAYING,
-                                isVoiceReady = isVoiceReady,
-                                errorMessage = null,
-                            )
-                        )
-                        updateMediaSessionState(controller.snapshot())
-                        updateForegroundNotification(controller.snapshot())
                         startProgressUpdates()
+                        syncControllerState()
                     }
 
                     override fun onDone(utteranceId: String?) {
@@ -210,500 +252,131 @@ class VodrPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
                             return
                         }
                         activeUtteranceId = null
-                        stopProgressUpdates()
-                        handleChapterFinished()
+                        if (player.hasNextMediaItem()) {
+                            player.seekToNextMediaItem()
+                            if (!player.isPlaying) {
+                                player.play()
+                            }
+                        } else {
+                            player.pause()
+                        }
+                        syncControllerState()
                     }
 
+                    @Deprecated("Use onError(String?, Int) when migrating to newer TTS callbacks.")
                     override fun onError(utteranceId: String?) {
                         if (utteranceId != activeUtteranceId) {
                             return
                         }
                         activeUtteranceId = null
-                        stopProgressUpdates()
-                        abandonAudioFocus()
-                        controller.updateFromService(
-                            controller.snapshot().copy(
-                                playbackStatus = PlaybackStatus.ERROR,
-                                errorMessage = "Unable to speak the current chapter.",
-                                isVoiceReady = isVoiceReady,
-                            )
-                        )
-                        updateMediaSessionState(controller.snapshot())
-                        updateForegroundNotification(controller.snapshot())
+                        player.pause()
+                        syncControllerState(errorMessage = "Unable to speak the current chapter.")
                     }
 
                     override fun onStop(utteranceId: String?, interrupted: Boolean) {
-                        if (utteranceId != activeUtteranceId) {
-                            return
+                        if (utteranceId == activeUtteranceId) {
+                            activeUtteranceId = null
                         }
-                        activeUtteranceId = null
-                        stopProgressUpdates()
                     }
-                }
+                },
             )
         }
     }
 
-    private fun syncStateWithSession() {
-        val snapshot = controller.snapshot().copy(
-            isVoiceReady = isVoiceReady,
-            playbackStatus = if (controller.snapshot().queue.isEmpty()) {
-                PlaybackStatus.IDLE
-            } else {
-                controller.snapshot().playbackStatus
-            },
-        )
-        controller.updateFromService(snapshot)
-        updateMediaSessionState(snapshot)
-        updateForegroundNotification(snapshot)
-    }
+    private fun syncTtsWithPlayer(force: Boolean) {
+        if (!player.isPlaying || !isVoiceReady) {
+            stopCurrentUtterance()
+            return
+        }
 
-    private fun playCurrentChapter() {
         val snapshot = controller.snapshot()
-        val chapter = snapshot.currentChapter ?: run {
-            syncStateWithSession()
-            return
-        }
-        if (!isVoiceReady || textToSpeech == null) {
-            controller.updateFromService(
-                snapshot.copy(
-                    playbackStatus = PlaybackStatus.ERROR,
-                    errorMessage = "Voice engine is still preparing.",
-                    isVoiceReady = isVoiceReady,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            updateForegroundNotification(controller.snapshot())
-            return
-        }
-        if (!requestAudioFocus()) {
-            controller.updateFromService(
-                snapshot.copy(
-                    playbackStatus = PlaybackStatus.PAUSED,
-                    errorMessage = "Audio focus unavailable.",
-                    isVoiceReady = isVoiceReady,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            updateForegroundNotification(controller.snapshot())
+        val chapterIndex = player.currentMediaItemIndex.coerceAtLeast(0)
+        val chapter = snapshot.queue.getOrNull(chapterIndex) ?: return
+        val positionMs = player.currentPosition.coerceAtLeast(0L)
+        if (!force &&
+            activeUtteranceId != null &&
+            chapterIndex == activeChapterIndex &&
+            kotlin.math.abs(positionMs - activeStartPositionMs) < 1_000L
+        ) {
             return
         }
 
-        val durationMs = estimatedDurationMs(
+        val offset = PlaybackEstimator.estimatedCharacterOffset(
             text = chapter.text,
-            playbackSpeed = snapshot.playbackSpeed,
-        )
-        val resumePositionMs = if (snapshot.resumePositionMs >= durationMs) {
-            0L
-        } else {
-            snapshot.resumePositionMs
-        }
-        val offset = estimatedCharacterOffset(
-            text = chapter.text,
-            resumePositionMs = resumePositionMs,
-            playbackSpeed = snapshot.playbackSpeed,
+            positionMs = positionMs,
+            playbackSpeed = player.playbackParameters.speed,
         )
         val textToSpeak = chapter.text.drop(offset).trimStart()
         if (textToSpeak.isBlank()) {
-            handleChapterFinished()
+            if (player.hasNextMediaItem()) {
+                player.seekToNextMediaItem()
+            } else {
+                player.pause()
+            }
             return
         }
 
+        stopCurrentUtterance()
         activeUtteranceId = UUID.randomUUID().toString()
-        playbackBasePositionMs = resumePositionMs
-        utteranceStartElapsedRealtimeMs = SystemClock.elapsedRealtime()
-        controller.updateFromService(
-            snapshot.copy(
-                playbackStatus = PlaybackStatus.PREPARING,
-                resumePositionMs = resumePositionMs,
-                errorMessage = null,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-
-        textToSpeech?.setSpeechRate(snapshot.playbackSpeed)
-        val speakResult = textToSpeech?.speak(
+        activeChapterIndex = chapterIndex
+        activeStartPositionMs = positionMs
+        textToSpeech?.setSpeechRate(player.playbackParameters.speed)
+        val result = textToSpeech?.speak(
             textToSpeak,
             TextToSpeech.QUEUE_FLUSH,
             null,
             activeUtteranceId,
         ) ?: TextToSpeech.ERROR
-        if (speakResult != TextToSpeech.SUCCESS) {
+        if (result != TextToSpeech.SUCCESS) {
             activeUtteranceId = null
-            abandonAudioFocus()
-            controller.updateFromService(
-                controller.snapshot().copy(
-                    playbackStatus = PlaybackStatus.ERROR,
-                    errorMessage = "Unable to start playback.",
-                    isVoiceReady = isVoiceReady,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            updateForegroundNotification(controller.snapshot())
+            player.pause()
+            syncControllerState(errorMessage = "Unable to start narration.")
         }
     }
 
-    private fun pausePlayback() {
-        val snapshot = controller.snapshot()
-        val updatedPosition = snapshot.currentChapter?.let {
-            currentPlaybackPosition(
-                chapter = it,
-                playbackSpeed = snapshot.playbackSpeed,
-            )
-        } ?: snapshot.resumePositionMs
+    private fun stopCurrentUtterance() {
         activeUtteranceId = null
         textToSpeech?.stop()
         stopProgressUpdates()
-        abandonAudioFocus()
+    }
+
+    private fun syncControllerState(errorMessage: String? = controller.snapshot().errorMessage) {
+        val snapshot = controller.snapshot()
+        val currentChapterIndex = when {
+            snapshot.queue.isEmpty() -> 0
+            player.currentMediaItemIndex >= 0 -> player.currentMediaItemIndex.coerceIn(0, snapshot.queue.lastIndex)
+            else -> snapshot.currentChapterIndex.coerceIn(0, snapshot.queue.lastIndex)
+        }
         controller.updateFromService(
             snapshot.copy(
-                resumePositionMs = updatedPosition,
-                playbackStatus = if (snapshot.queue.isEmpty()) PlaybackStatus.IDLE else PlaybackStatus.PAUSED,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-    }
-
-    private fun skipToNext() {
-        val snapshot = controller.snapshot()
-        if (snapshot.currentChapterIndex >= snapshot.queue.lastIndex) {
-            return
-        }
-        val shouldResume = snapshot.playbackStatus == PlaybackStatus.PLAYING ||
-            snapshot.playbackStatus == PlaybackStatus.PREPARING
-        stopCurrentUtterance()
-        controller.updateFromService(
-            snapshot.copy(
-                currentChapterIndex = snapshot.currentChapterIndex + 1,
-                resumePositionMs = 0L,
-                playbackStatus = PlaybackStatus.PAUSED,
-                errorMessage = null,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-        if (shouldResume) {
-            playCurrentChapter()
-        }
-    }
-
-    private fun skipToPrevious() {
-        val snapshot = controller.snapshot()
-        if (snapshot.currentChapterIndex <= 0) {
-            seekTo(0L)
-            return
-        }
-        val shouldResume = snapshot.playbackStatus == PlaybackStatus.PLAYING ||
-            snapshot.playbackStatus == PlaybackStatus.PREPARING
-        stopCurrentUtterance()
-        controller.updateFromService(
-            snapshot.copy(
-                currentChapterIndex = snapshot.currentChapterIndex - 1,
-                resumePositionMs = 0L,
-                playbackStatus = PlaybackStatus.PAUSED,
-                errorMessage = null,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-        if (shouldResume) {
-            playCurrentChapter()
-        }
-    }
-
-    private fun seekBy(deltaMs: Long) {
-        val snapshot = controller.snapshot()
-        val chapter = snapshot.currentChapter ?: return
-        val target = (snapshot.resumePositionMs + deltaMs).coerceIn(
-            0L,
-            estimatedDurationMs(chapter.text, snapshot.playbackSpeed),
-        )
-        seekTo(target)
-    }
-
-    private fun seekTo(positionMs: Long) {
-        val snapshot = controller.snapshot()
-        val shouldResume = snapshot.playbackStatus == PlaybackStatus.PLAYING ||
-            snapshot.playbackStatus == PlaybackStatus.PREPARING
-        stopCurrentUtterance()
-        controller.updateFromService(
-            snapshot.copy(
-                resumePositionMs = positionMs.coerceAtLeast(0L),
-                playbackStatus = PlaybackStatus.PAUSED,
-                errorMessage = null,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-        if (shouldResume) {
-            playCurrentChapter()
-        }
-    }
-
-    private fun updatePlaybackSpeed(playbackSpeed: Float) {
-        val snapshot = controller.snapshot()
-        val clampedSpeed = playbackSpeed.coerceIn(0.75f, 2.0f)
-        val shouldResume = snapshot.playbackStatus == PlaybackStatus.PLAYING ||
-            snapshot.playbackStatus == PlaybackStatus.PREPARING
-        stopCurrentUtterance()
-        controller.updateFromService(
-            snapshot.copy(
-                playbackSpeed = clampedSpeed,
-                playbackStatus = PlaybackStatus.PAUSED,
-                errorMessage = null,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-        if (shouldResume) {
-            playCurrentChapter()
-        }
-    }
-
-    private fun selectChapter(chapterIndex: Int) {
-        val snapshot = controller.snapshot()
-        if (snapshot.queue.isEmpty()) {
-            return
-        }
-        val shouldResume = snapshot.playbackStatus == PlaybackStatus.PLAYING ||
-            snapshot.playbackStatus == PlaybackStatus.PREPARING
-        stopCurrentUtterance()
-        controller.updateFromService(
-            snapshot.copy(
-                currentChapterIndex = chapterIndex.coerceIn(0, snapshot.queue.lastIndex),
-                resumePositionMs = 0L,
-                playbackStatus = PlaybackStatus.PAUSED,
-                errorMessage = null,
-                isVoiceReady = isVoiceReady,
-            )
-        )
-        updateMediaSessionState(controller.snapshot())
-        updateForegroundNotification(controller.snapshot())
-        if (shouldResume) {
-            playCurrentChapter()
-        }
-    }
-
-    private fun handleChapterFinished() {
-        val snapshot = controller.snapshot()
-        val chapter = snapshot.currentChapter
-        if (chapter == null) {
-            controller.updateFromService(
-                snapshot.copy(
-                    playbackStatus = PlaybackStatus.IDLE,
-                    isVoiceReady = isVoiceReady,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            updateForegroundNotification(controller.snapshot())
-            return
-        }
-
-        val chapterDurationMs = estimatedDurationMs(
-            text = chapter.text,
-            playbackSpeed = snapshot.playbackSpeed,
-        )
-        if (snapshot.currentChapterIndex < snapshot.queue.lastIndex) {
-            controller.updateFromService(
-                snapshot.copy(
-                    currentChapterIndex = snapshot.currentChapterIndex + 1,
-                    resumePositionMs = 0L,
-                    playbackStatus = PlaybackStatus.PAUSED,
-                    isVoiceReady = isVoiceReady,
-                    errorMessage = null,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            updateForegroundNotification(controller.snapshot())
-            playCurrentChapter()
-        } else {
-            abandonAudioFocus()
-            controller.updateFromService(
-                snapshot.copy(
-                    resumePositionMs = chapterDurationMs,
-                    playbackStatus = PlaybackStatus.PAUSED,
-                    isVoiceReady = isVoiceReady,
-                    errorMessage = null,
-                )
-            )
-            updateMediaSessionState(controller.snapshot())
-            updateForegroundNotification(controller.snapshot())
-        }
-    }
-
-    private fun updateMediaSessionState(state: PlaybackState) {
-        val chapter = state.currentChapter
-        val playbackState = PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY or
-                    PlaybackStateCompat.ACTION_PAUSE or
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                    PlaybackStateCompat.ACTION_SEEK_TO or
-                    PlaybackStateCompat.ACTION_FAST_FORWARD or
-                    PlaybackStateCompat.ACTION_REWIND
-            )
-            .setState(
-                when (state.playbackStatus) {
-                    PlaybackStatus.PLAYING -> PlaybackStateCompat.STATE_PLAYING
-                    PlaybackStatus.PREPARING -> PlaybackStateCompat.STATE_BUFFERING
-                    PlaybackStatus.PAUSED -> PlaybackStateCompat.STATE_PAUSED
-                    PlaybackStatus.ERROR -> PlaybackStateCompat.STATE_ERROR
-                    PlaybackStatus.IDLE -> PlaybackStateCompat.STATE_STOPPED
+                currentChapterIndex = currentChapterIndex,
+                resumePositionMs = if (snapshot.queue.isEmpty()) {
+                    0L
+                } else {
+                    player.currentPosition.coerceAtLeast(0L)
                 },
-                state.resumePositionMs,
-                state.playbackSpeed,
-            )
-            .build()
-        mediaSession.setPlaybackState(playbackState)
-        mediaSession.setMetadata(
-            MediaMetadataCompat.Builder()
-                .putString(
-                    MediaMetadataCompat.METADATA_KEY_TITLE,
-                    chapter?.title ?: "Vodr Player",
-                )
-                .putLong(
-                    MediaMetadataCompat.METADATA_KEY_DURATION,
-                    if (chapter == null) {
-                        0L
-                    } else {
-                        estimatedDurationMs(
-                            text = chapter.text,
-                            playbackSpeed = state.playbackSpeed,
-                        )
-                    },
-                )
-                .build()
+                playbackSpeed = player.playbackParameters.speed.coerceIn(0.75f, 2.0f),
+                playbackStatus = when {
+                    errorMessage != null -> PlaybackStatus.ERROR
+                    snapshot.queue.isEmpty() -> PlaybackStatus.IDLE
+                    !isVoiceReady -> PlaybackStatus.PREPARING
+                    player.isPlaying -> PlaybackStatus.PLAYING
+                    player.playbackState == Player.STATE_BUFFERING -> PlaybackStatus.PREPARING
+                    else -> PlaybackStatus.PAUSED
+                },
+                isVoiceReady = isVoiceReady,
+                errorMessage = errorMessage,
+            ),
         )
     }
 
-    private fun updateForegroundNotification(state: PlaybackState) {
-        if (state.queue.isEmpty()) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return
-        }
-        startForeground(NOTIFICATION_ID, buildNotification(state))
-    }
-
-    private fun buildNotification(state: PlaybackState): Notification {
-        val chapter = state.currentChapter
-        val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
-            state.playbackStatus == PlaybackStatus.PREPARING
-        val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
-            PendingIntent.getActivity(
-                this,
-                REQUEST_CONTENT_INTENT,
-                launchIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
-
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play)
-            .setContentTitle(chapter?.title ?: "Vodr Player")
-            .setContentText(
-                when (state.playbackStatus) {
-                    PlaybackStatus.PLAYING -> "Playing narration"
-                    PlaybackStatus.PREPARING -> "Preparing narration"
-                    PlaybackStatus.PAUSED -> "Playback paused"
-                    PlaybackStatus.ERROR -> state.errorMessage ?: "Playback error"
-                    PlaybackStatus.IDLE -> "Ready to play"
-                }
-            )
-            .setOnlyAlertOnce(true)
-            .setOngoing(isPlaying)
-            .setContentIntent(contentIntent)
-            .addAction(
-                NotificationCompat.Action(
-                    android.R.drawable.ic_media_previous,
-                    "Previous",
-                    servicePendingIntent(ACTION_PREVIOUS, REQUEST_PREVIOUS),
-                )
-            )
-            .addAction(
-                NotificationCompat.Action(
-                    if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                    if (isPlaying) "Pause" else "Play",
-                    servicePendingIntent(
-                        if (isPlaying) ACTION_PAUSE else ACTION_PLAY,
-                        if (isPlaying) REQUEST_PAUSE else REQUEST_PLAY,
-                    ),
-                )
-            )
-            .addAction(
-                NotificationCompat.Action(
-                    android.R.drawable.ic_media_next,
-                    "Next",
-                    servicePendingIntent(ACTION_NEXT, REQUEST_NEXT),
-                )
-            )
-            .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle()
-                    .setMediaSession(mediaSession.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
-            .build()
-    }
-
-    private fun servicePendingIntent(action: String, requestCode: Int): PendingIntent {
-        val intent = Intent(this, VodrPlaybackService::class.java).apply {
-            this.action = action
-        }
-        return PendingIntent.getService(
+    private fun sessionActivityPendingIntent(): PendingIntent? {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+        return PendingIntent.getActivity(
             this,
-            requestCode,
-            intent,
+            REQUEST_CONTENT_INTENT,
+            launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
-
-    private fun requestAudioFocus(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val request = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
-                .setOnAudioFocusChangeListener(this)
-                .build()
-                .also { audioFocusRequest = it }
-            audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                this,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN,
-            ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        }
-    }
-
-    private fun abandonAudioFocus() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let(audioManager::abandonAudioFocusRequest)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(this)
-        }
-    }
-
-    private fun registerBecomingNoisyReceiver() {
-        ContextCompat.registerReceiver(
-            this,
-            becomingNoisyReceiver,
-            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
         )
     }
 
@@ -714,51 +387,6 @@ class VodrPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
     private fun stopProgressUpdates() {
         progressHandler.removeCallbacks(progressUpdater)
-    }
-
-    private fun stopCurrentUtterance() {
-        activeUtteranceId = null
-        textToSpeech?.stop()
-        stopProgressUpdates()
-    }
-
-    private fun currentPlaybackPosition(
-        chapter: PlaybackChapter,
-        playbackSpeed: Float,
-    ): Long {
-        val elapsedMs = (SystemClock.elapsedRealtime() - utteranceStartElapsedRealtimeMs).coerceAtLeast(0L)
-        val chapterDurationMs = estimatedDurationMs(chapter.text, playbackSpeed)
-        return (playbackBasePositionMs + elapsedMs).coerceIn(0L, chapterDurationMs)
-    }
-
-    private fun estimatedDurationMs(
-        text: String,
-        playbackSpeed: Float,
-    ): Long {
-        val charsPerSecond = BASE_CHARACTERS_PER_SECOND * playbackSpeed.coerceAtLeast(0.1f)
-        return ((text.length / charsPerSecond) * 1_000f).toLong().coerceAtLeast(1_000L)
-    }
-
-    private fun estimatedCharacterOffset(
-        text: String,
-        resumePositionMs: Long,
-        playbackSpeed: Float,
-    ): Int {
-        val charsPerSecond = BASE_CHARACTERS_PER_SECOND * playbackSpeed.coerceAtLeast(0.1f)
-        val offset = ((resumePositionMs / 1_000f) * charsPerSecond).toInt()
-        return offset.coerceIn(0, text.length)
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationManager.createNotificationChannel(
-                NotificationChannel(
-                    NOTIFICATION_CHANNEL_ID,
-                    "Playback",
-                    NotificationManager.IMPORTANCE_LOW,
-                )
-            )
-        }
     }
 
     companion object {
@@ -778,15 +406,8 @@ class VodrPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
         const val EXTRA_PLAYBACK_SPEED: String = "extra_playback_speed"
         const val EXTRA_CHAPTER_INDEX: String = "extra_chapter_index"
 
-        private const val NOTIFICATION_CHANNEL_ID: String = "vodr_playback"
-        private const val NOTIFICATION_ID: Int = 1001
-        private const val SESSION_TAG: String = "vodr-playback-session"
         private const val PROGRESS_UPDATE_INTERVAL_MS: Long = 500L
-        private const val BASE_CHARACTERS_PER_SECOND: Float = 14f
+        private const val RESTART_THRESHOLD_MS: Long = 2_000L
         private const val REQUEST_CONTENT_INTENT: Int = 1
-        private const val REQUEST_PREVIOUS: Int = 2
-        private const val REQUEST_PLAY: Int = 3
-        private const val REQUEST_PAUSE: Int = 4
-        private const val REQUEST_NEXT: Int = 5
     }
 }
