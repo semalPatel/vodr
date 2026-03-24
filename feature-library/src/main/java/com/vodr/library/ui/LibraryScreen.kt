@@ -4,7 +4,9 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +20,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -42,7 +44,7 @@ import com.vodr.library.ImportDocumentRequest
 import com.vodr.library.LibraryViewModel
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onOpenGenerate: () -> Unit = {},
@@ -162,11 +164,12 @@ fun LibraryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
+                expanded = true,
                 onClick = { showAddSheet = true },
-            ) {
-                Text(text = "+")
-            }
+                icon = { Text(text = "+") },
+                text = { Text(text = "Add Book") },
+            )
         },
     ) { contentPadding ->
         Surface(modifier = Modifier.padding(contentPadding)) {
@@ -183,47 +186,49 @@ fun LibraryScreen(
                 if (state.errorMessage != null) {
                     Text(text = state.errorMessage)
                 }
-                if (state.documents.isEmpty()) {
-                    Text(text = "No books yet. Tap Add Book to import your first title.")
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(
-                            items = state.documents,
-                            key = { it.id },
-                        ) { document ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable(onClick = onOpenGenerate),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                                ),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                Crossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
+                    if (isEmpty) {
+                        Text(text = "No books yet. Tap Add Book to import your first title.")
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(
+                                items = state.documents,
+                                key = { it.id },
+                            ) { document ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(onClick = onOpenGenerate),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                    ),
                                 ) {
-                                    Text(
-                                        text = document.metadata.displayName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        AssistChip(
-                                            onClick = {},
-                                            label = {
-                                                Text(
-                                                    text = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
-                                                )
-                                            },
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        Text(
+                                            text = document.metadata.displayName,
+                                            style = MaterialTheme.typography.titleMedium,
                                         )
-                                        document.metadata.byteCount?.let { size ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             AssistChip(
                                                 onClick = {},
-                                                label = { Text(text = "${size / 1024} KB") },
+                                                label = {
+                                                    Text(
+                                                        text = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
+                                                    )
+                                                },
                                             )
+                                            document.metadata.byteCount?.let { size ->
+                                                AssistChip(
+                                                    onClick = {},
+                                                    label = { Text(text = "${size / 1024} KB") },
+                                                )
+                                            }
                                         }
                                     }
                                 }

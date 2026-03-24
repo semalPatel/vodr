@@ -2,7 +2,6 @@ package com.vodr.generate.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -11,6 +10,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -74,22 +76,38 @@ fun GenerateScreen(
                 )
                 Text(text = "Document")
                 documents.forEach { document ->
-                    OutlinedButton(
-                        onClick = { selectedDocumentId = document.id },
-                    ) {
-                        val marker = if (selectedDocumentId == document.id) "[selected] " else ""
-                        Text(text = marker + document.displayName)
+                    val isSelected = selectedDocumentId == document.id
+                    if (isSelected) {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { selectedDocumentId = document.id },
+                        ) {
+                            Text(text = document.displayName)
+                        }
+                    } else {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { selectedDocumentId = document.id },
+                        ) {
+                            Text(text = document.displayName)
+                        }
                     }
                 }
 
                 Text(text = "Mode")
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GenerationMode.entries.forEach { mode ->
-                        OutlinedButton(
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    GenerationMode.entries.forEachIndexed { index, mode ->
+                        SegmentedButton(
+                            selected = selectedMode == mode,
                             onClick = { selectedMode = mode },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = GenerationMode.entries.size,
+                            ),
                         ) {
-                            val marker = if (selectedMode == mode) "* " else ""
-                            Text(text = marker + mode.name)
+                            Text(text = mode.name.replace('_', ' '))
                         }
                     }
                 }
