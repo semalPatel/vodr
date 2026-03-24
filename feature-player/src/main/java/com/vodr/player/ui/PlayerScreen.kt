@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.playback.PlaybackChapter
 import com.vodr.player.PlayerViewModel
 import java.util.Locale
@@ -33,7 +35,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 fun PlayerScreen(
     queue: List<PlaybackChapter> = emptyList(),
-    viewModel: PlayerViewModel = remember { PlayerViewModel() },
+    viewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -46,7 +48,7 @@ fun PlayerScreen(
             viewModel.updateQueue(queue)
         }
     }
-    val state = viewModel.state
+    val state = viewModel.state.collectAsStateWithLifecycle().value
     val currentChapter = state.queue.getOrNull(state.currentChapterIndex)
 
     LaunchedEffect(currentChapter?.id) {

@@ -10,11 +10,11 @@ class PlayerViewModelTest {
     fun resumePositionStartsAtZeroAndCanBeUpdated() {
         val viewModel = PlayerViewModel()
 
-        assertEquals(0L, viewModel.state.resumePositionMs)
+        assertEquals(0L, viewModel.state.value.resumePositionMs)
 
         viewModel.updateResumePosition(12_345L)
 
-        assertEquals(12_345L, viewModel.state.resumePositionMs)
+        assertEquals(12_345L, viewModel.state.value.resumePositionMs)
     }
 
     @Test
@@ -29,15 +29,15 @@ class PlayerViewModelTest {
             ),
         )
 
-        assertEquals(0, viewModel.state.currentChapterIndex)
+        assertEquals(0, viewModel.state.value.currentChapterIndex)
 
         viewModel.goToNextChapter()
 
-        assertEquals(1, viewModel.state.currentChapterIndex)
+        assertEquals(1, viewModel.state.value.currentChapterIndex)
 
         viewModel.goToPreviousChapter()
 
-        assertEquals(0, viewModel.state.currentChapterIndex)
+        assertEquals(0, viewModel.state.value.currentChapterIndex)
     }
 
     @Test
@@ -54,7 +54,7 @@ class PlayerViewModelTest {
         viewModel.goToNextChapter()
         viewModel.goToNextChapter()
 
-        assertEquals(2, viewModel.state.currentChapterIndex)
+        assertEquals(2, viewModel.state.value.currentChapterIndex)
 
         viewModel.updateQueue(
             listOf(
@@ -68,8 +68,8 @@ class PlayerViewModelTest {
                 PlaybackChapter(id = "chapter-1", title = "One", text = "Chapter one"),
                 PlaybackChapter(id = "chapter-2", title = "Two", text = "Chapter two"),
             ),
-            viewModel.state.queue,
+            viewModel.state.value.queue,
         )
-        assertEquals(1, viewModel.state.currentChapterIndex)
+        assertEquals(1, viewModel.state.value.currentChapterIndex)
     }
 }

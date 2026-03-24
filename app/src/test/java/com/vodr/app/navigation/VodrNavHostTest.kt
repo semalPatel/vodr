@@ -8,13 +8,13 @@ class VodrNavHostTest {
     fun `nav host exposes library generate player and settings routes with library start destination`() {
         assertEquals(
             listOf(
-                VodrNavRoutes.libraryRoute,
-                VodrNavRoutes.generateRoute,
-                VodrNavRoutes.playerRoute,
-                VodrNavRoutes.settingsRoute,
+                VodrRoute.Library.route,
+                VodrRoute.Generate.route,
+                VodrRoute.Player.route,
+                VodrRoute.Settings.route,
             ),
             VodrNavRoutes.routes,
         )
-        assertEquals(VodrNavRoutes.libraryRoute, VodrNavRoutes.startDestination)
+        assertEquals(VodrRoute.Library.route, VodrNavRoutes.startDestination)
     }
 }

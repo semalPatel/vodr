@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
+import com.vodr.generate.toUserMessage
 
 data class GenerationSourceDocument(
     val id: String,
@@ -105,8 +106,8 @@ fun GenerateScreen(
                 if (generationState.isGenerating) {
                     CircularProgressIndicator()
                 }
-                if (generationState.errorMessage != null) {
-                    Text(text = generationState.errorMessage)
+                if (generationState.error != null) {
+                    Text(text = generationState.error.toUserMessage())
                 }
             }
         }

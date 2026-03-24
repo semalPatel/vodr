@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 data class GenerationUiState(
     val isGenerating: Boolean = false,
     val queue: List<PlaybackChapter> = emptyList(),
-    val errorMessage: String? = null,
+    val error: GenerationError? = null,
 )
 
 class GenerationViewModel(
@@ -36,13 +36,13 @@ class GenerationViewModel(
                 it.copy(
                     isGenerating = true,
                     queue = emptyList(),
-                    errorMessage = null,
+                    error = null,
                 )
             }
             val result = runCatching {
                 withContext(ioDispatcher) {
                     val inputStream = openInputStream(document)
-                        ?: error("Unable to open selected document stream.")
+                        ?: throw IllegalStateException("Document stream unavailable")
                     inputStream.use {
                         orchestrator.buildPlaybackQueue(
                             document = document,
@@ -58,13 +58,13 @@ class GenerationViewModel(
                         GenerationUiState(
                             isGenerating = false,
                             queue = emptyList(),
-                            errorMessage = "Generation produced no playable chapters.",
+                            error = GenerationError.EmptyResult,
                         )
                     } else {
                         GenerationUiState(
                             isGenerating = false,
                             queue = queue,
-                            errorMessage = null,
+                            error = null,
                         )
                     }
                 },
@@ -72,7 +72,11 @@ class GenerationViewModel(
                     GenerationUiState(
                         isGenerating = false,
                         queue = emptyList(),
-                        errorMessage = error.message ?: "Generation failed.",
+                        error = if (error is IllegalStateException) {
+                            GenerationError.DocumentOpenFailure
+                        } else {
+                            GenerationError.ProcessingFailure(error.message)
+                        },
                     )
                 },
             )

@@ -1,11 +1,13 @@
 package com.vodr.player
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
 import com.vodr.playback.InMemoryVodrPlayerController
 import com.vodr.playback.PlaybackChapter
 import com.vodr.playback.VodrPlayerController
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 data class PlayerUiState(
     val queue: List<PlaybackChapter> = emptyList(),
@@ -15,45 +17,47 @@ data class PlayerUiState(
 
 class PlayerViewModel(
     private val controller: VodrPlayerController = InMemoryVodrPlayerController(),
-) {
-    var state by mutableStateOf(PlayerUiState())
-        private set
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(PlayerUiState())
+    val state: StateFlow<PlayerUiState> = mutableState.asStateFlow()
 
     fun updateQueue(queue: List<PlaybackChapter>) {
         val clampedIndex = if (queue.isEmpty()) {
             0
         } else {
-            state.currentChapterIndex.coerceIn(0, queue.lastIndex)
+            state.value.currentChapterIndex.coerceIn(0, queue.lastIndex)
         }
-        state = state.copy(
+        mutableState.update {
+            it.copy(
             queue = queue,
             currentChapterIndex = clampedIndex,
-        )
+            )
+        }
         controller.updateQueue(
             queue = queue,
             currentChapterIndex = clampedIndex,
-            resumePositionMs = state.resumePositionMs,
+            resumePositionMs = state.value.resumePositionMs,
         )
     }
 
     fun goToNextChapter() {
-        if (state.currentChapterIndex < state.queue.lastIndex) {
-            val nextIndex = state.currentChapterIndex + 1
-            state = state.copy(currentChapterIndex = nextIndex)
+        if (state.value.currentChapterIndex < state.value.queue.lastIndex) {
+            val nextIndex = state.value.currentChapterIndex + 1
+            mutableState.update { it.copy(currentChapterIndex = nextIndex) }
             controller.goToNextChapter()
         }
     }
 
     fun goToPreviousChapter() {
-        if (state.currentChapterIndex > 0) {
-            val previousIndex = state.currentChapterIndex - 1
-            state = state.copy(currentChapterIndex = previousIndex)
+        if (state.value.currentChapterIndex > 0) {
+            val previousIndex = state.value.currentChapterIndex - 1
+            mutableState.update { it.copy(currentChapterIndex = previousIndex) }
             controller.goToPreviousChapter()
         }
     }
 
     fun updateResumePosition(resumePositionMs: Long) {
-        state = state.copy(resumePositionMs = resumePositionMs)
+        mutableState.update { it.copy(resumePositionMs = resumePositionMs) }
         controller.updateResumePosition(resumePositionMs)
     }
 }

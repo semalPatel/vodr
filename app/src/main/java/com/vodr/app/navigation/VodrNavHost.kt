@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -19,14 +20,30 @@ import com.vodr.library.ui.LibraryScreen
 import com.vodr.library.settings.SettingsScreen
 import com.vodr.player.ui.PlayerScreen
 
-object VodrNavRoutes {
-    const val libraryRoute = "library"
-    const val generateRoute = "generate"
-    const val playerRoute = "player"
-    const val settingsRoute = "settings"
+sealed interface VodrRoute {
+    val route: String
 
-    val routes = listOf(libraryRoute, generateRoute, playerRoute, settingsRoute)
-    const val startDestination = libraryRoute
+    data object Library : VodrRoute { override val route: String = "library" }
+    data object Generate : VodrRoute { override val route: String = "generate" }
+    data object Player : VodrRoute { override val route: String = "player" }
+    data object Settings : VodrRoute { override val route: String = "settings" }
+}
+
+object VodrNavRoutes {
+    val routes = listOf(
+        VodrRoute.Library.route,
+        VodrRoute.Generate.route,
+        VodrRoute.Player.route,
+        VodrRoute.Settings.route,
+    )
+    const val startDestination = "library"
+}
+
+private fun NavHostController.navigateTo(
+    route: VodrRoute,
+    builder: NavOptionsBuilder.() -> Unit = {},
+) {
+    navigate(route.route, builder)
 }
 
 @Composable
@@ -43,18 +60,18 @@ fun VodrNavHost(
         navController = navController,
         startDestination = VodrNavRoutes.startDestination,
     ) {
-        composable(VodrNavRoutes.libraryRoute) {
+        composable(VodrRoute.Library.route) {
             LibraryScreen(
                 viewModel = libraryViewModel,
                 onOpenGenerate = {
-                    navController.navigate(VodrNavRoutes.generateRoute)
+                    navController.navigateTo(VodrRoute.Generate)
                 },
                 onOpenSettings = {
-                    navController.navigate(VodrNavRoutes.settingsRoute)
+                    navController.navigateTo(VodrRoute.Settings)
                 },
             )
         }
-        composable(VodrNavRoutes.generateRoute) {
+        composable(VodrRoute.Generate.route) {
             GenerateScreen(
                 generationState = generationState,
                 documents = libraryState.documents.map {
@@ -81,14 +98,14 @@ fun VodrNavHost(
                     )
                 },
                 onOpenPlayer = {
-                    navController.navigate(VodrNavRoutes.playerRoute)
+                    navController.navigateTo(VodrRoute.Player)
                 },
             )
         }
-        composable(VodrNavRoutes.playerRoute) {
+        composable(VodrRoute.Player.route) {
             PlayerScreen(queue = generationState.queue)
         }
-        composable(VodrNavRoutes.settingsRoute) {
+        composable(VodrRoute.Settings.route) {
             SettingsScreen()
         }
     }
