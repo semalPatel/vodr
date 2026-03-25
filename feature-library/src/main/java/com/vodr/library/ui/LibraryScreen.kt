@@ -31,6 +31,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -73,17 +74,22 @@ fun LibraryScreen(
     continueListeningChapterTitle: String? = null,
     continueListeningProgress: Float = 0f,
     continueListeningStatus: String? = null,
+    continueListeningIsFavorite: Boolean = false,
     recentSessions: List<RecentListeningSessionItem> = emptyList(),
     onOpenGenerate: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onResumePlayback: () -> Unit = {},
+    onToggleContinueFavorite: () -> Unit = {},
     onOpenRecentSession: (String) -> Unit = {},
     onRemoveRecentSession: (String) -> Unit = {},
+    onToggleRecentSessionFavorite: (String, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val state = viewModel.state.collectAsStateWithLifecycle().value
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
+    val favoriteSessions = recentSessions.filter { it.isFavorite }
+    val recentNonFavoriteSessions = recentSessions.filterNot { it.isFavorite }
 
     LaunchedEffect(state.lastImportedDocumentId) {
         if (state.lastImportedDocumentId != null) {
@@ -228,14 +234,25 @@ fun LibraryScreen(
                         chapterTitle = continueListeningChapterTitle,
                         progress = continueListeningProgress,
                         status = continueListeningStatus ?: "Ready",
+                        isFavorite = continueListeningIsFavorite,
                         onResumePlayback = onResumePlayback,
+                        onToggleFavorite = onToggleContinueFavorite,
                     )
                 }
-                if (recentSessions.isNotEmpty()) {
-                    RecentSessionsSection(
-                        sessions = recentSessions,
+                if (favoriteSessions.isNotEmpty()) {
+                    FavoriteSessionsSection(
+                        sessions = favoriteSessions,
                         onOpenSession = onOpenRecentSession,
                         onRemoveSession = onRemoveRecentSession,
+                        onToggleFavorite = onToggleRecentSessionFavorite,
+                    )
+                }
+                if (recentNonFavoriteSessions.isNotEmpty()) {
+                    RecentSessionsSection(
+                        sessions = recentNonFavoriteSessions,
+                        onOpenSession = onOpenRecentSession,
+                        onRemoveSession = onRemoveRecentSession,
+                        onToggleFavorite = onToggleRecentSessionFavorite,
                     )
                 }
                 Text(
@@ -290,6 +307,7 @@ data class RecentListeningSessionItem(
     val chapterTitle: String,
     val progressFraction: Float,
     val updatedAtEpochMs: Long,
+    val isFavorite: Boolean = false,
     val personalizationProviderLabel: String? = null,
     val transcriptionProviderLabel: String? = null,
 )
@@ -351,7 +369,9 @@ private fun ContinueListeningCard(
     chapterTitle: String?,
     progress: Float,
     status: String,
+    isFavorite: Boolean,
     onResumePlayback: () -> Unit,
+    onToggleFavorite: () -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -376,10 +396,20 @@ private fun ContinueListeningCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    text = "Continue listening",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Continue listening",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    FilterChip(
+                        selected = isFavorite,
+                        onClick = onToggleFavorite,
+                        label = { Text(text = "Favorite") },
+                    )
+                }
                 Text(
                     text = documentTitle,
                     style = MaterialTheme.typography.titleLarge,
@@ -413,15 +443,63 @@ private fun ContinueListeningCard(
 }
 
 @Composable
+private fun FavoriteSessionsSection(
+    sessions: List<RecentListeningSessionItem>,
+    onOpenSession: (String) -> Unit,
+    onRemoveSession: (String) -> Unit,
+    onToggleFavorite: (String, Boolean) -> Unit,
+) {
+    SessionShelfSection(
+        title = "Favorites",
+        subtitle = "Keep your best books one tap away.",
+        sessions = sessions,
+        containerAlpha = 0.68f,
+        useSecondaryContainer = true,
+        onOpenSession = onOpenSession,
+        onRemoveSession = onRemoveSession,
+        onToggleFavorite = onToggleFavorite,
+    )
+}
+
+@Composable
 private fun RecentSessionsSection(
     sessions: List<RecentListeningSessionItem>,
     onOpenSession: (String) -> Unit,
     onRemoveSession: (String) -> Unit,
+    onToggleFavorite: (String, Boolean) -> Unit,
+) {
+    SessionShelfSection(
+        title = "Recent listening sessions",
+        subtitle = "Jump back into saved books without regenerating.",
+        sessions = sessions,
+        containerAlpha = 0.35f,
+        useSecondaryContainer = false,
+        onOpenSession = onOpenSession,
+        onRemoveSession = onRemoveSession,
+        onToggleFavorite = onToggleFavorite,
+    )
+}
+
+@Composable
+private fun SessionShelfSection(
+    title: String,
+    subtitle: String,
+    sessions: List<RecentListeningSessionItem>,
+    containerAlpha: Float,
+    useSecondaryContainer: Boolean,
+    onOpenSession: (String) -> Unit,
+    onRemoveSession: ((String) -> Unit)?,
+    onToggleFavorite: (String, Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "Recent listening sessions",
+            text = title,
             style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             itemsIndexed(
@@ -434,7 +512,11 @@ private fun RecentSessionsSection(
                         .animateContentSize()
                         .clickable { onOpenSession(session.sessionId) },
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        containerColor = if (useSecondaryContainer) {
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = containerAlpha)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = containerAlpha)
+                        },
                     ),
                 ) {
                     Column(
@@ -480,6 +562,12 @@ private fun RecentSessionsSection(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (session.isFavorite) {
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text(text = "Favorite") },
+                                )
+                            }
                             session.personalizationProviderLabel?.let { label ->
                                 AssistChip(
                                     onClick = {},
@@ -497,8 +585,20 @@ private fun RecentSessionsSection(
                             TextButton(onClick = { onOpenSession(session.sessionId) }) {
                                 Text(text = "Open")
                             }
-                            TextButton(onClick = { onRemoveSession(session.sessionId) }) {
-                                Text(text = "Remove")
+                            FilterChip(
+                                selected = session.isFavorite,
+                                onClick = {
+                                    onToggleFavorite(
+                                        session.sessionId,
+                                        !session.isFavorite,
+                                    )
+                                },
+                                label = { Text(text = "Favorite") },
+                            )
+                            onRemoveSession?.let { remove ->
+                                TextButton(onClick = { remove(session.sessionId) }) {
+                                    Text(text = "Remove")
+                                }
                             }
                         }
                     }

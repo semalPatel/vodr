@@ -75,4 +75,14 @@ class PlayerViewModel @Inject constructor(
     fun removeSession(sessionId: String) {
         controller.removeSession(sessionId)
     }
+
+    fun setSessionFavorite(
+        sessionId: String,
+        isFavorite: Boolean,
+    ) {
+        controller.setSessionFavorite(
+            sessionId = sessionId,
+            isFavorite = isFavorite,
+        )
+    }
 }

@@ -138,6 +138,7 @@ fun VodrNavHost(
                     continueListeningChapterTitle = playerState.currentChapter?.title,
                     continueListeningProgress = playbackProgress,
                     continueListeningStatus = playerState.playbackStatus.toMiniPlayerLabel(),
+                    continueListeningIsFavorite = playerState.sessionHistory.firstOrNull()?.isFavorite == true,
                     recentSessions = playerState.sessionHistory.drop(1).map { it.toRecentListeningSessionItem() },
                     onOpenGenerate = {
                         navController.navigateTo(VodrRoute.Generate)
@@ -148,11 +149,25 @@ fun VodrNavHost(
                     onResumePlayback = {
                         navController.navigateTo(VodrRoute.Player)
                     },
+                    onToggleContinueFavorite = {
+                        playerState.sessionHistory.firstOrNull()?.let { session ->
+                            playerViewModel.setSessionFavorite(
+                                sessionId = session.sessionId,
+                                isFavorite = !session.isFavorite,
+                            )
+                        }
+                    },
                     onOpenRecentSession = { sessionId ->
                         playerViewModel.restoreSession(sessionId)
                         navController.navigateTo(VodrRoute.Player)
                     },
                     onRemoveRecentSession = playerViewModel::removeSession,
+                    onToggleRecentSessionFavorite = { sessionId, isFavorite ->
+                        playerViewModel.setSessionFavorite(
+                            sessionId = sessionId,
+                            isFavorite = isFavorite,
+                        )
+                    },
                 )
             }
             composable(VodrRoute.Generate.route) {
@@ -258,6 +273,7 @@ private fun com.vodr.playback.PlaybackSessionSummary.toRecentListeningSessionIte
         chapterTitle = chapterTitle,
         progressFraction = progressFraction,
         updatedAtEpochMs = updatedAtEpochMs,
+        isFavorite = isFavorite,
         personalizationProviderLabel = personalizationProviderLabel,
         transcriptionProviderLabel = transcriptionProviderLabel,
     )

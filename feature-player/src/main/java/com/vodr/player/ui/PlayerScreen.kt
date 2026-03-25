@@ -142,6 +142,7 @@ fun PlayerScreen(
                         currentSessionId = currentSessionId,
                         onRestoreSession = viewModel::restoreSession,
                         onRemoveSession = viewModel::removeSession,
+                        onSetFavorite = viewModel::setSessionFavorite,
                     )
                 }
                 Card(
@@ -328,7 +329,13 @@ private fun ListeningSessionsCard(
     currentSessionId: String?,
     onRestoreSession: (String) -> Unit,
     onRemoveSession: (String) -> Unit,
+    onSetFavorite: (String, Boolean) -> Unit,
 ) {
+    val displayedSessions = sessions.sortedWith(
+        compareByDescending<PlaybackSessionSummary> { it.sessionId == currentSessionId }
+            .thenByDescending { it.isFavorite }
+            .thenByDescending { it.updatedAtEpochMs },
+    )
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -346,13 +353,13 @@ private fun ListeningSessionsCard(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Switch between saved books without regenerating the queue.",
+                text = "Switch between saved books and keep favorites pinned near the top.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 itemsIndexed(
-                    items = sessions,
+                    items = displayedSessions,
                     key = { _, session -> session.sessionId },
                 ) { _, session ->
                     val isCurrent = session.sessionId == currentSessionId
@@ -361,6 +368,8 @@ private fun ListeningSessionsCard(
                         colors = CardDefaults.cardColors(
                             containerColor = if (isCurrent) {
                                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
+                            } else if (session.isFavorite) {
+                                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
                             } else {
                                 MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
                             },
@@ -411,12 +420,28 @@ private fun ListeningSessionsCard(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (session.isFavorite) {
+                                    AssistChip(
+                                        onClick = {},
+                                        label = { Text(text = "Favorite") },
+                                    )
+                                }
                                 TextButton(
                                     onClick = { onRestoreSession(session.sessionId) },
                                     enabled = !isCurrent,
                                 ) {
                                     Text(text = if (isCurrent) "Current session" else "Switch")
                                 }
+                                FilterChip(
+                                    selected = session.isFavorite,
+                                    onClick = {
+                                        onSetFavorite(
+                                            session.sessionId,
+                                            !session.isFavorite,
+                                        )
+                                    },
+                                    label = { Text(text = "Favorite") },
+                                )
                                 if (!isCurrent) {
                                     TextButton(onClick = { onRemoveSession(session.sessionId) }) {
                                         Text(text = "Remove")

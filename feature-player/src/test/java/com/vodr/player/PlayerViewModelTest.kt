@@ -141,6 +141,20 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun setSessionFavoriteDelegatesToController() {
+        val controller = FakeVodrPlayerController()
+        val viewModel = PlayerViewModel(controller)
+
+        viewModel.setSessionFavorite(
+            sessionId = "content://book/three",
+            isFavorite = true,
+        )
+
+        assertEquals("content://book/three", controller.favoriteSessionId)
+        assertEquals(true, controller.favoriteSessionValue)
+    }
+
+    @Test
     fun updatingQueueForNewDocument_resetsChapterAndResumePosition() {
         val viewModel = PlayerViewModel(FakeVodrPlayerController())
 
@@ -181,6 +195,8 @@ class PlayerViewModelTest {
         var selectChapterCalled: Boolean = false
         var restoredSessionId: String? = null
         var removedSessionId: String? = null
+        var favoriteSessionId: String? = null
+        var favoriteSessionValue: Boolean? = null
 
         override fun updateQueue(
             queue: List<PlaybackChapter>,
@@ -259,6 +275,14 @@ class PlayerViewModelTest {
 
         override fun removeSession(sessionId: String) {
             removedSessionId = sessionId
+        }
+
+        override fun setSessionFavorite(
+            sessionId: String,
+            isFavorite: Boolean,
+        ) {
+            favoriteSessionId = sessionId
+            favoriteSessionValue = isFavorite
         }
     }
 }

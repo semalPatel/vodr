@@ -140,6 +140,19 @@ class ForegroundVodrPlayerController @Inject constructor(
         }
     }
 
+    override fun setSessionFavorite(
+        sessionId: String,
+        isFavorite: Boolean,
+    ) {
+        val history = sessionStore.setFavorite(
+            sessionId = sessionId,
+            isFavorite = isFavorite,
+        )
+        mutableState.update { current ->
+            current.copy(sessionHistory = history.toSessionHistory())
+        }
+    }
+
     internal fun snapshot(): PlaybackState = state.value
 
     internal fun updateFromService(state: PlaybackState) {

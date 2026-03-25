@@ -11,6 +11,7 @@ class PlaybackSessionCodecTest {
         val snapshot = PlaybackSessionSnapshot(
             sessionId = "content://books/demo",
             updatedAtEpochMs = 123_456L,
+            isFavorite = true,
             queue = listOf(
                 PlaybackChapter(
                     id = "chapter-1",
@@ -52,6 +53,7 @@ class PlaybackSessionCodecTest {
         val first = PlaybackSessionSnapshot(
             sessionId = "content://books/one",
             updatedAtEpochMs = 2_000L,
+            isFavorite = true,
             queue = listOf(
                 PlaybackChapter(id = "chapter-1", title = "One", text = "One"),
             ),

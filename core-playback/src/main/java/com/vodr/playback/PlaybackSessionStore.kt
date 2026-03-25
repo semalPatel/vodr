@@ -9,6 +9,7 @@ import javax.inject.Singleton
 internal data class PlaybackSessionSnapshot(
     val sessionId: String,
     val updatedAtEpochMs: Long,
+    val isFavorite: Boolean = false,
     val queue: List<PlaybackChapter>,
     val activeDocument: PlaybackDocument?,
     val runtimeMetadata: PlaybackRuntimeMetadata?,
@@ -27,6 +28,12 @@ internal object PlaybackSessionCodec {
             append('\t')
             append(snapshot.updatedAtEpochMs)
             appendLine()
+            if (snapshot.isFavorite) {
+                append("FAVORITE")
+                append('\t')
+                append('1')
+                appendLine()
+            }
             snapshot.activeDocument?.let { document ->
                 append("DOC")
                 append('\t')
@@ -80,6 +87,7 @@ internal object PlaybackSessionCodec {
         }
         var sessionId: String? = null
         var updatedAtEpochMs = 0L
+        var isFavorite = false
         var activeDocument: PlaybackDocument? = null
         var runtimeMetadata: PlaybackRuntimeMetadata? = null
         var currentChapterIndex = 0
@@ -93,6 +101,10 @@ internal object PlaybackSessionCodec {
                 "SESSION" -> {
                     sessionId = tokens.getOrNull(1)?.let(::unescape)
                     updatedAtEpochMs = tokens.getOrNull(2)?.toLongOrNull() ?: 0L
+                }
+
+                "FAVORITE" -> {
+                    isFavorite = tokens.getOrNull(1) == "1"
                 }
 
                 "DOC" -> {
@@ -151,6 +163,7 @@ internal object PlaybackSessionCodec {
                 ?.takeIf { it.isNotBlank() }
                 ?: deriveSessionId(activeDocument = activeDocument, queue = queue),
             updatedAtEpochMs = updatedAtEpochMs,
+            isFavorite = isFavorite,
             queue = queue,
             activeDocument = activeDocument,
             runtimeMetadata = runtimeMetadata,
@@ -323,6 +336,21 @@ class PlaybackSessionStore @Inject constructor(
         return updated
     }
 
+    internal fun setFavorite(
+        sessionId: String,
+        isFavorite: Boolean,
+    ): List<PlaybackSessionSnapshot> {
+        val updated = loadHistory().map { snapshot ->
+            if (snapshot.sessionId == sessionId) {
+                snapshot.copy(isFavorite = isFavorite)
+            } else {
+                snapshot
+            }
+        }
+        saveHistory(updated)
+        return updated
+    }
+
     internal fun clear() {
         runCatching {
             if (sessionFile.exists()) {
@@ -370,9 +398,11 @@ internal fun PlaybackState.toPlaybackSessionSnapshot(
     if (queue.isEmpty()) {
         return null
     }
+    val sessionId = deriveSessionId(activeDocument = activeDocument, queue = queue)
     return PlaybackSessionSnapshot(
-        sessionId = deriveSessionId(activeDocument = activeDocument, queue = queue),
+        sessionId = sessionId,
         updatedAtEpochMs = nowEpochMs,
+        isFavorite = sessionHistory.firstOrNull { it.sessionId == sessionId }?.isFavorite == true,
         queue = queue,
         activeDocument = activeDocument,
         runtimeMetadata = runtimeMetadata,
@@ -440,6 +470,7 @@ internal fun List<PlaybackSessionSnapshot>.toSessionHistory(): List<PlaybackSess
                 0f
             },
             updatedAtEpochMs = snapshot.updatedAtEpochMs,
+            isFavorite = snapshot.isFavorite,
             personalizationProviderLabel = snapshot.runtimeMetadata?.personalizationProviderLabel,
             transcriptionProviderLabel = snapshot.runtimeMetadata?.transcriptionProviderLabel,
         )

@@ -32,6 +32,7 @@ data class PlaybackSessionSummary(
     val chapterTitle: String,
     val progressFraction: Float,
     val updatedAtEpochMs: Long,
+    val isFavorite: Boolean = false,
     val personalizationProviderLabel: String? = null,
     val transcriptionProviderLabel: String? = null,
 )
@@ -98,6 +99,11 @@ interface VodrPlayerController {
     fun restoreSession(sessionId: String)
 
     fun removeSession(sessionId: String)
+
+    fun setSessionFavorite(
+        sessionId: String,
+        isFavorite: Boolean,
+    )
 }
 
 class InMemoryVodrPlayerController : VodrPlayerController {
@@ -247,6 +253,23 @@ class InMemoryVodrPlayerController : VodrPlayerController {
         mutableState.update { current ->
             current.copy(
                 sessionHistory = current.sessionHistory.filterNot { it.sessionId == sessionId },
+            )
+        }
+    }
+
+    override fun setSessionFavorite(
+        sessionId: String,
+        isFavorite: Boolean,
+    ) {
+        mutableState.update { current ->
+            current.copy(
+                sessionHistory = current.sessionHistory.map { session ->
+                    if (session.sessionId == sessionId) {
+                        session.copy(isFavorite = isFavorite)
+                    } else {
+                        session
+                    }
+                },
             )
         }
     }
