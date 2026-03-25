@@ -7,6 +7,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 internal data class PlaybackSessionSnapshot(
+    val sessionId: String,
+    val updatedAtEpochMs: Long,
     val queue: List<PlaybackChapter>,
     val activeDocument: PlaybackDocument?,
     val runtimeMetadata: PlaybackRuntimeMetadata?,
@@ -19,6 +21,12 @@ internal object PlaybackSessionCodec {
     fun encode(snapshot: PlaybackSessionSnapshot): String {
         return buildString {
             appendLine(HEADER_LINE)
+            append("SESSION")
+            append('\t')
+            append(escape(snapshot.sessionId))
+            append('\t')
+            append(snapshot.updatedAtEpochMs)
+            appendLine()
             snapshot.activeDocument?.let { document ->
                 append("DOC")
                 append('\t')
@@ -70,6 +78,8 @@ internal object PlaybackSessionCodec {
         if (lines.firstOrNull() != HEADER_LINE) {
             return null
         }
+        var sessionId: String? = null
+        var updatedAtEpochMs = 0L
         var activeDocument: PlaybackDocument? = null
         var runtimeMetadata: PlaybackRuntimeMetadata? = null
         var currentChapterIndex = 0
@@ -80,6 +90,11 @@ internal object PlaybackSessionCodec {
         lines.drop(1).forEach { line ->
             val tokens = splitEscaped(line)
             when (tokens.firstOrNull()) {
+                "SESSION" -> {
+                    sessionId = tokens.getOrNull(1)?.let(::unescape)
+                    updatedAtEpochMs = tokens.getOrNull(2)?.toLongOrNull() ?: 0L
+                }
+
                 "DOC" -> {
                     if (tokens.size >= 4) {
                         activeDocument = PlaybackDocument(
@@ -132,6 +147,10 @@ internal object PlaybackSessionCodec {
         }
 
         return PlaybackSessionSnapshot(
+            sessionId = sessionId
+                ?.takeIf { it.isNotBlank() }
+                ?: deriveSessionId(activeDocument = activeDocument, queue = queue),
+            updatedAtEpochMs = updatedAtEpochMs,
             queue = queue,
             activeDocument = activeDocument,
             runtimeMetadata = runtimeMetadata,
@@ -203,24 +222,99 @@ internal object PlaybackSessionCodec {
     private const val HEADER_LINE: String = "VODR_PLAYBACK_SESSION_V1"
 }
 
+internal object PlaybackSessionHistoryCodec {
+    fun encode(history: List<PlaybackSessionSnapshot>): String {
+        return buildString {
+            appendLine(HEADER_LINE)
+            history.forEach { snapshot ->
+                appendLine(SESSION_BEGIN_LINE)
+                append(PlaybackSessionCodec.encode(snapshot))
+                appendLine(SESSION_END_LINE)
+            }
+        }
+    }
+
+    fun decode(serialized: String): List<PlaybackSessionSnapshot> {
+        if (serialized.isBlank()) {
+            return emptyList()
+        }
+        val lines = serialized.lines()
+        if (lines.firstOrNull() != HEADER_LINE) {
+            return emptyList()
+        }
+        val snapshots = mutableListOf<PlaybackSessionSnapshot>()
+        val currentBlock = mutableListOf<String>()
+        var isCollecting = false
+        lines.drop(1).forEach { line ->
+            when (line) {
+                SESSION_BEGIN_LINE -> {
+                    isCollecting = true
+                    currentBlock.clear()
+                }
+
+                SESSION_END_LINE -> {
+                    if (isCollecting) {
+                        PlaybackSessionCodec.decode(currentBlock.joinToString(separator = "\n"))
+                            ?.let(snapshots::add)
+                    }
+                    currentBlock.clear()
+                    isCollecting = false
+                }
+
+                else -> {
+                    if (isCollecting) {
+                        currentBlock += line
+                    }
+                }
+            }
+        }
+        return snapshots
+    }
+
+    private const val HEADER_LINE: String = "VODR_PLAYBACK_HISTORY_V1"
+    private const val SESSION_BEGIN_LINE: String = "BEGIN_SESSION"
+    private const val SESSION_END_LINE: String = "END_SESSION"
+}
+
 @Singleton
 class PlaybackSessionStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
-    internal fun load(): PlaybackSessionSnapshot? {
+    internal fun load(): PlaybackSessionSnapshot? = loadHistory().firstOrNull()
+
+    internal fun loadHistory(): List<PlaybackSessionSnapshot> {
         return runCatching {
             if (!sessionFile.exists()) {
-                null
+                emptyList()
             } else {
-                PlaybackSessionCodec.decode(sessionFile.readText())
+                decodePersistedHistory(sessionFile.readText())
             }
-        }.getOrNull()
+        }.getOrDefault(emptyList())
     }
 
-    internal fun save(snapshot: PlaybackSessionSnapshot) {
+    internal fun save(snapshot: PlaybackSessionSnapshot): List<PlaybackSessionSnapshot> {
+        val history = buildHistory(snapshot, loadHistory())
+        saveHistory(history)
+        return history
+    }
+
+    internal fun saveHistory(history: List<PlaybackSessionSnapshot>) {
         runCatching {
-            sessionFile.writeText(PlaybackSessionCodec.encode(snapshot))
+            sessionFile.writeText(
+                PlaybackSessionHistoryCodec.encode(history.take(MAX_HISTORY_SIZE)),
+            )
         }
+    }
+
+    internal fun restore(sessionId: String): List<PlaybackSessionSnapshot> {
+        val existing = loadHistory()
+        val target = existing.firstOrNull { it.sessionId == sessionId } ?: return existing
+        val updated = buildHistory(
+            snapshot = target.copy(updatedAtEpochMs = System.currentTimeMillis()),
+            existing = existing,
+        )
+        saveHistory(updated)
+        return updated
     }
 
     internal fun clear() {
@@ -234,16 +328,45 @@ class PlaybackSessionStore @Inject constructor(
     private val sessionFile: File
         get() = File(context.filesDir, SESSION_FILE_NAME)
 
+    private fun decodePersistedHistory(serialized: String): List<PlaybackSessionSnapshot> {
+        return when {
+            serialized.startsWith("VODR_PLAYBACK_HISTORY_V1") -> {
+                PlaybackSessionHistoryCodec.decode(serialized)
+            }
+
+            serialized.startsWith("VODR_PLAYBACK_SESSION_V1") -> {
+                PlaybackSessionCodec.decode(serialized)?.let(::listOf) ?: emptyList()
+            }
+
+            else -> emptyList()
+        }
+    }
+
+    private fun buildHistory(
+        snapshot: PlaybackSessionSnapshot,
+        existing: List<PlaybackSessionSnapshot>,
+    ): List<PlaybackSessionSnapshot> {
+        return buildList {
+            add(snapshot)
+            addAll(existing.filterNot { it.sessionId == snapshot.sessionId })
+        }.take(MAX_HISTORY_SIZE)
+    }
+
     private companion object {
         private const val SESSION_FILE_NAME: String = "vodr-playback-session.txt"
+        private const val MAX_HISTORY_SIZE: Int = 5
     }
 }
 
-internal fun PlaybackState.toPlaybackSessionSnapshot(): PlaybackSessionSnapshot? {
+internal fun PlaybackState.toPlaybackSessionSnapshot(
+    nowEpochMs: Long = System.currentTimeMillis(),
+): PlaybackSessionSnapshot? {
     if (queue.isEmpty()) {
         return null
     }
     return PlaybackSessionSnapshot(
+        sessionId = deriveSessionId(activeDocument = activeDocument, queue = queue),
+        updatedAtEpochMs = nowEpochMs,
         queue = queue,
         activeDocument = activeDocument,
         runtimeMetadata = runtimeMetadata,
@@ -253,13 +376,16 @@ internal fun PlaybackState.toPlaybackSessionSnapshot(): PlaybackSessionSnapshot?
     )
 }
 
-internal fun PlaybackSessionSnapshot.toPlaybackState(): PlaybackState {
+internal fun PlaybackSessionSnapshot.toPlaybackState(
+    history: List<PlaybackSessionSnapshot>,
+): PlaybackState {
     val clampedIndex = currentChapterIndex.coerceIn(0, queue.lastIndex)
     val clampedSpeed = playbackSpeed.coerceIn(0.75f, 2.0f)
     return PlaybackState(
         queue = queue,
         activeDocument = activeDocument,
         runtimeMetadata = runtimeMetadata,
+        sessionHistory = history.toSessionHistory(),
         currentChapterIndex = clampedIndex,
         resumePositionMs = resumePositionMs.coerceAtLeast(0L),
         currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->
@@ -277,4 +403,48 @@ internal fun PlaybackSessionSnapshot.toPlaybackState(): PlaybackState {
 
 private fun String?.orNullIfBlank(): String? {
     return this?.takeIf { it.isNotBlank() }
+}
+
+internal fun List<PlaybackSessionSnapshot>.toSessionHistory(): List<PlaybackSessionSummary> {
+    return map { snapshot ->
+        val document = snapshot.activeDocument
+        val chapterTitle = snapshot.queue
+            .getOrNull(snapshot.currentChapterIndex.coerceIn(0, snapshot.queue.lastIndex))
+            ?.title
+            ?: snapshot.queue.firstOrNull()?.title
+            ?: "Listening session"
+        val durationMs = snapshot.queue
+            .getOrNull(snapshot.currentChapterIndex.coerceIn(0, snapshot.queue.lastIndex))
+            ?.let { chapter ->
+                PlaybackEstimator.estimatedDurationMs(
+                    text = chapter.text,
+                    playbackSpeed = snapshot.playbackSpeed,
+                )
+            }
+            ?: 0L
+        PlaybackSessionSummary(
+            sessionId = snapshot.sessionId,
+            documentTitle = document?.title ?: chapterTitle,
+            documentSourceUri = document?.sourceUri ?: snapshot.sessionId,
+            documentMimeType = document?.mimeType ?: "application/octet-stream",
+            chapterTitle = chapterTitle,
+            progressFraction = if (durationMs > 0L) {
+                (snapshot.resumePositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            },
+            updatedAtEpochMs = snapshot.updatedAtEpochMs,
+            personalizationProviderLabel = snapshot.runtimeMetadata?.personalizationProviderLabel,
+            transcriptionProviderLabel = snapshot.runtimeMetadata?.transcriptionProviderLabel,
+        )
+    }
+}
+
+private fun deriveSessionId(
+    activeDocument: PlaybackDocument?,
+    queue: List<PlaybackChapter>,
+): String {
+    return activeDocument?.sourceUri?.takeIf { it.isNotBlank() }
+        ?: queue.firstOrNull()?.id
+        ?: "vodr-session"
 }

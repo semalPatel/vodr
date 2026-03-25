@@ -67,4 +67,8 @@ class PlayerViewModel @Inject constructor(
     fun selectChapter(chapterIndex: Int) {
         controller.selectChapter(chapterIndex)
     }
+
+    fun restoreSession(sessionId: String) {
+        controller.restoreSession(sessionId)
+    }
 }

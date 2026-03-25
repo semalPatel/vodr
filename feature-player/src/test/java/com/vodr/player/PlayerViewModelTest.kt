@@ -121,6 +121,16 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun restoreSessionDelegatesToController() {
+        val controller = FakeVodrPlayerController()
+        val viewModel = PlayerViewModel(controller)
+
+        viewModel.restoreSession("content://book/one")
+
+        assertEquals("content://book/one", controller.restoredSessionId)
+    }
+
+    @Test
     fun updatingQueueForNewDocument_resetsChapterAndResumePosition() {
         val viewModel = PlayerViewModel(FakeVodrPlayerController())
 
@@ -159,6 +169,7 @@ class PlayerViewModelTest {
         override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()
 
         var selectChapterCalled: Boolean = false
+        var restoredSessionId: String? = null
 
         override fun updateQueue(
             queue: List<PlaybackChapter>,
@@ -229,6 +240,10 @@ class PlayerViewModelTest {
                 },
                 resumePositionMs = 0L,
             )
+        }
+
+        override fun restoreSession(sessionId: String) {
+            restoredSessionId = sessionId
         }
     }
 }

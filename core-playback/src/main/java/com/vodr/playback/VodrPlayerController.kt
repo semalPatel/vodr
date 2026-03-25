@@ -24,6 +24,18 @@ data class PlaybackRuntimeMetadata(
     val transcriptionDetail: String? = null,
 )
 
+data class PlaybackSessionSummary(
+    val sessionId: String,
+    val documentTitle: String,
+    val documentSourceUri: String,
+    val documentMimeType: String,
+    val chapterTitle: String,
+    val progressFraction: Float,
+    val updatedAtEpochMs: Long,
+    val personalizationProviderLabel: String? = null,
+    val transcriptionProviderLabel: String? = null,
+)
+
 enum class PlaybackStatus {
     IDLE,
     PREPARING,
@@ -36,6 +48,7 @@ data class PlaybackState(
     val queue: List<PlaybackChapter> = emptyList(),
     val activeDocument: PlaybackDocument? = null,
     val runtimeMetadata: PlaybackRuntimeMetadata? = null,
+    val sessionHistory: List<PlaybackSessionSummary> = emptyList(),
     val currentChapterIndex: Int = 0,
     val resumePositionMs: Long = 0L,
     val currentChapterDurationMs: Long = 0L,
@@ -81,6 +94,8 @@ interface VodrPlayerController {
     fun setPlaybackSpeed(playbackSpeed: Float)
 
     fun selectChapter(chapterIndex: Int)
+
+    fun restoreSession(sessionId: String)
 }
 
 class InMemoryVodrPlayerController : VodrPlayerController {
@@ -209,6 +224,19 @@ class InMemoryVodrPlayerController : VodrPlayerController {
                         playbackSpeed = current.playbackSpeed,
                     )
                 } ?: 0L,
+            )
+        }
+    }
+
+    override fun restoreSession(sessionId: String) {
+        val target = state.value.sessionHistory.firstOrNull { it.sessionId == sessionId } ?: return
+        mutableState.update { current ->
+            current.copy(
+                activeDocument = PlaybackDocument(
+                    title = target.documentTitle,
+                    sourceUri = target.documentSourceUri,
+                    mimeType = target.documentMimeType,
+                ),
             )
         }
     }

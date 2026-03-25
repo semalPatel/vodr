@@ -20,8 +20,10 @@ class ForegroundVodrPlayerController @Inject constructor(
     @param:ApplicationContext private val applicationContext: Context,
     private val sessionStore: PlaybackSessionStore,
 ) : VodrPlayerController {
+    private val initialHistory = sessionStore.loadHistory()
     private val mutableState = MutableStateFlow(
-        sessionStore.load()?.toPlaybackState() ?: PlaybackState(),
+        initialHistory.firstOrNull()?.toPlaybackState(initialHistory)
+            ?: PlaybackState(sessionHistory = initialHistory.toSessionHistory()),
     )
     override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()
 
@@ -38,6 +40,7 @@ class ForegroundVodrPlayerController @Inject constructor(
                 queue = queue,
                 activeDocument = activeDocument ?: current.activeDocument,
                 runtimeMetadata = runtimeMetadata ?: current.runtimeMetadata,
+                sessionHistory = current.sessionHistory,
                 currentChapterIndex = clampedIndex,
                 resumePositionMs = resumePositionMs.coerceAtLeast(0L),
                 currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->
@@ -119,6 +122,13 @@ class ForegroundVodrPlayerController @Inject constructor(
         )
     }
 
+    override fun restoreSession(sessionId: String) {
+        val history = sessionStore.restore(sessionId)
+        val restored = history.firstOrNull { it.sessionId == sessionId } ?: return
+        mutableState.value = restored.toPlaybackState(history)
+        dispatchAction(VodrPlaybackService.ACTION_SYNC_QUEUE)
+    }
+
     internal fun snapshot(): PlaybackState = state.value
 
     internal fun updateFromService(state: PlaybackState) {
@@ -172,7 +182,16 @@ class ForegroundVodrPlayerController @Inject constructor(
     }
 
     private fun persistCurrentState() {
-        state.value.toPlaybackSessionSnapshot()?.let(sessionStore::save) ?: sessionStore.clear()
+        val snapshot = state.value.toPlaybackSessionSnapshot() ?: run {
+            mutableState.update { current ->
+                current.copy(sessionHistory = sessionStore.loadHistory().toSessionHistory())
+            }
+            return
+        }
+        val history = sessionStore.save(snapshot)
+        mutableState.update { current ->
+            current.copy(sessionHistory = history.toSessionHistory())
+        }
     }
 }
 

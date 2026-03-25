@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -71,9 +73,11 @@ fun LibraryScreen(
     continueListeningChapterTitle: String? = null,
     continueListeningProgress: Float = 0f,
     continueListeningStatus: String? = null,
+    recentSessions: List<RecentListeningSessionItem> = emptyList(),
     onOpenGenerate: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onResumePlayback: () -> Unit = {},
+    onOpenRecentSession: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -226,6 +230,12 @@ fun LibraryScreen(
                         onResumePlayback = onResumePlayback,
                     )
                 }
+                if (recentSessions.isNotEmpty()) {
+                    RecentSessionsSection(
+                        sessions = recentSessions,
+                        onOpenSession = onOpenRecentSession,
+                    )
+                }
                 Text(
                     text = "Recently opened books",
                     style = MaterialTheme.typography.titleMedium,
@@ -269,6 +279,18 @@ fun LibraryScreen(
         }
     }
 }
+
+data class RecentListeningSessionItem(
+    val sessionId: String,
+    val documentTitle: String,
+    val documentSourceUri: String,
+    val documentMimeType: String,
+    val chapterTitle: String,
+    val progressFraction: Float,
+    val updatedAtEpochMs: Long,
+    val personalizationProviderLabel: String? = null,
+    val transcriptionProviderLabel: String? = null,
+)
 
 @Composable
 private fun LibraryHeroCard(
@@ -382,6 +404,93 @@ private fun ContinueListeningCard(
                 )
                 TextButton(onClick = onResumePlayback) {
                     Text(text = "Open player")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentSessionsSection(
+    sessions: List<RecentListeningSessionItem>,
+    onOpenSession: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "Recent listening sessions",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            itemsIndexed(
+                items = sessions,
+                key = { _, session -> session.sessionId },
+            ) { _, session ->
+                Card(
+                    modifier = Modifier
+                        .width(260.dp)
+                        .animateContentSize()
+                        .clickable { onOpenSession(session.sessionId) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            DocumentArtworkThumbnail(
+                                title = session.documentTitle,
+                                sourceUri = session.documentSourceUri,
+                                mimeType = session.documentMimeType,
+                                modifier = Modifier.size(width = 56.dp, height = 76.dp),
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    text = session.documentTitle,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = session.chapterTitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = relativeImportedLabel(session.updatedAtEpochMs),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { session.progressFraction.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            session.personalizationProviderLabel?.let { label ->
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text(text = "AI: $label") },
+                                )
+                            }
+                            session.transcriptionProviderLabel?.let { label ->
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text(text = "Transcript: $label") },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

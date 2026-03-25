@@ -9,6 +9,8 @@ class PlaybackSessionCodecTest {
     @Test
     fun encodeAndDecode_roundTripsPlaybackSessionWithEscapedText() {
         val snapshot = PlaybackSessionSnapshot(
+            sessionId = "content://books/demo",
+            updatedAtEpochMs = 123_456L,
             queue = listOf(
                 PlaybackChapter(
                     id = "chapter-1",
@@ -43,6 +45,51 @@ class PlaybackSessionCodecTest {
 
         assertNotNull(restored)
         assertEquals(snapshot, restored)
+    }
+
+    @Test
+    fun historyCodec_roundTripsMultipleSnapshotsInOrder() {
+        val first = PlaybackSessionSnapshot(
+            sessionId = "content://books/one",
+            updatedAtEpochMs = 2_000L,
+            queue = listOf(
+                PlaybackChapter(id = "chapter-1", title = "One", text = "One"),
+            ),
+            activeDocument = PlaybackDocument(
+                title = "Book One",
+                sourceUri = "content://books/one",
+                mimeType = "application/pdf",
+            ),
+            runtimeMetadata = null,
+            currentChapterIndex = 0,
+            resumePositionMs = 900L,
+            playbackSpeed = 1.0f,
+        )
+        val second = PlaybackSessionSnapshot(
+            sessionId = "content://books/two",
+            updatedAtEpochMs = 1_000L,
+            queue = listOf(
+                PlaybackChapter(id = "chapter-2", title = "Two", text = "Two"),
+            ),
+            activeDocument = PlaybackDocument(
+                title = "Book Two",
+                sourceUri = "content://books/two",
+                mimeType = "application/epub+zip",
+            ),
+            runtimeMetadata = PlaybackRuntimeMetadata(
+                personalizationProviderLabel = "Device AI",
+                transcriptionProviderLabel = "Offline Heuristic",
+            ),
+            currentChapterIndex = 0,
+            resumePositionMs = 1_200L,
+            playbackSpeed = 1.25f,
+        )
+
+        val restored = PlaybackSessionHistoryCodec.decode(
+            PlaybackSessionHistoryCodec.encode(listOf(first, second)),
+        )
+
+        assertEquals(listOf(first, second), restored)
     }
 
     @Test

@@ -48,6 +48,7 @@ import com.vodr.generate.GenerationViewModel
 import com.vodr.generate.ui.GenerateScreen
 import com.vodr.generate.ui.GenerationSourceDocument
 import com.vodr.library.LibraryViewModel
+import com.vodr.library.ui.RecentListeningSessionItem
 import com.vodr.library.ui.LibraryScreen
 import com.vodr.library.settings.SettingsScreen
 import com.vodr.library.settings.SettingsUiState
@@ -137,6 +138,7 @@ fun VodrNavHost(
                     continueListeningChapterTitle = playerState.currentChapter?.title,
                     continueListeningProgress = playbackProgress,
                     continueListeningStatus = playerState.playbackStatus.toMiniPlayerLabel(),
+                    recentSessions = playerState.sessionHistory.drop(1).map { it.toRecentListeningSessionItem() },
                     onOpenGenerate = {
                         navController.navigateTo(VodrRoute.Generate)
                     },
@@ -144,6 +146,10 @@ fun VodrNavHost(
                         navController.navigateTo(VodrRoute.Settings)
                     },
                     onResumePlayback = {
+                        navController.navigateTo(VodrRoute.Player)
+                    },
+                    onOpenRecentSession = { sessionId ->
+                        playerViewModel.restoreSession(sessionId)
                         navController.navigateTo(VodrRoute.Player)
                     },
                 )
@@ -240,6 +246,20 @@ private fun com.vodr.generate.GenerationRuntimeSummary.toPlaybackRuntimeMetadata
         personalizationDetail = personalizationDetail,
         transcriptionProviderLabel = transcriptionProvider.toDisplayName(),
         transcriptionDetail = transcriptionDetail,
+    )
+}
+
+private fun com.vodr.playback.PlaybackSessionSummary.toRecentListeningSessionItem(): RecentListeningSessionItem {
+    return RecentListeningSessionItem(
+        sessionId = sessionId,
+        documentTitle = documentTitle,
+        documentSourceUri = documentSourceUri,
+        documentMimeType = documentMimeType,
+        chapterTitle = chapterTitle,
+        progressFraction = progressFraction,
+        updatedAtEpochMs = updatedAtEpochMs,
+        personalizationProviderLabel = personalizationProviderLabel,
+        transcriptionProviderLabel = transcriptionProviderLabel,
     )
 }
 
