@@ -38,6 +38,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
 
     implementation(composeBom)
+    implementation(project(":core-parser"))
     implementation(project(":core-playback"))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)

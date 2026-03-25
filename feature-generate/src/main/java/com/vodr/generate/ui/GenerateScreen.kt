@@ -1,5 +1,8 @@
 package com.vodr.generate.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -151,24 +154,36 @@ private fun GenerationStatusCard(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         ),
     ) {
+        val animatedProgress by animateFloatAsState(
+            targetValue = generationState.phase.progress,
+            label = "generation-phase-progress",
+        )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = generationState.phase.title,
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = generationState.phase.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Crossfade(
+                targetState = generationState.phase,
+                label = "generation-phase-copy",
+            ) { phase ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = phase.title,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        text = phase.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (generationState.isGenerating) {
                 LinearProgressIndicator(
-                    progress = { generationState.phase.progress },
+                    progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

@@ -1,5 +1,11 @@
 package com.vodr.player.ui
 
+import android.graphics.Bitmap
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +25,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -26,24 +33,35 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackChapter
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun PlayerScreen(
     queue: List<PlaybackChapter> = emptyList(),
+    documentTitle: String? = null,
+    documentSourceUri: String? = null,
+    documentMimeType: String? = null,
     personalizationProviderLabel: String? = null,
     transcriptionProviderLabel: String? = null,
     viewModel: PlayerViewModel = viewModel(),
@@ -57,16 +75,39 @@ fun PlayerScreen(
 
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val currentChapter = state.currentChapter
-    val chapterProgress = if (state.queue.isEmpty()) {
+    val chapterProgressTarget = if (state.queue.isEmpty()) {
         0f
     } else {
         (state.currentChapterIndex + 1).toFloat() / state.queue.size.toFloat()
     }
-    val chapterListeningProgress = if (state.currentChapterDurationMs > 0L) {
-        (state.resumePositionMs.toFloat() / state.currentChapterDurationMs.toFloat()).coerceIn(0f, 1f)
+    var isScrubbing by remember(currentChapter?.id) { mutableStateOf(false) }
+    var scrubPositionMs by remember(currentChapter?.id) { mutableStateOf(state.resumePositionMs.toFloat()) }
+    val currentChapterDurationMs = state.currentChapterDurationMs.coerceAtLeast(0L)
+    LaunchedEffect(state.resumePositionMs, state.currentChapterDurationMs, currentChapter?.id, isScrubbing) {
+        if (!isScrubbing) {
+            scrubPositionMs = state.resumePositionMs
+                .coerceIn(0L, currentChapterDurationMs)
+                .toFloat()
+        }
+    }
+    val displayedPositionMs = if (isScrubbing) {
+        scrubPositionMs.toLong()
+    } else {
+        state.resumePositionMs
+    }.coerceIn(0L, currentChapterDurationMs)
+    val chapterListeningProgressTarget = if (currentChapterDurationMs > 0L) {
+        (displayedPositionMs.toFloat() / currentChapterDurationMs.toFloat()).coerceIn(0f, 1f)
     } else {
         0f
     }
+    val animatedChapterProgress by animateFloatAsState(
+        targetValue = chapterProgressTarget,
+        label = "player-chapter-progress",
+    )
+    val animatedListeningProgress by animateFloatAsState(
+        targetValue = chapterListeningProgressTarget,
+        label = "player-listening-progress",
+    )
     val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
         state.playbackStatus == PlaybackStatus.PREPARING
     var isChapterMenuExpanded by remember { mutableStateOf(false) }
@@ -85,40 +126,94 @@ fun PlayerScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 PlayerHeroCard(
+                    documentTitle = documentTitle,
+                    documentSourceUri = documentSourceUri,
+                    documentMimeType = documentMimeType,
                     chapterTitle = currentChapter?.title ?: "No generated chapter yet.",
                     chapterIndex = state.currentChapterIndex + 1,
                     chapterCount = state.queue.size.coerceAtLeast(1),
-                    chapterProgress = chapterProgress,
-                    listeningProgress = chapterListeningProgress,
-                    listeningLabel = "${formatPlaybackTime(state.resumePositionMs)} / ${formatPlaybackTime(state.currentChapterDurationMs)}",
+                    chapterProgress = animatedChapterProgress,
+                    listeningProgress = animatedListeningProgress,
+                    listeningLabel = "${formatPlaybackTime(displayedPositionMs)} / ${formatPlaybackTime(currentChapterDurationMs)}",
                     isVoiceReady = state.isVoiceReady,
                     playbackStatusLabel = state.playbackStatus.toReadableLabel(),
                     personalizationProviderLabel = personalizationProviderLabel,
                     transcriptionProviderLabel = transcriptionProviderLabel,
                 )
-                currentChapter?.let { chapter ->
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        ),
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        Text(
+                            text = "Playback position",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Slider(
+                            value = displayedPositionMs.toFloat(),
+                            onValueChange = { value ->
+                                isScrubbing = true
+                                scrubPositionMs = value
+                            },
+                            onValueChangeFinished = {
+                                viewModel.updateResumePosition(scrubPositionMs.toLong())
+                                isScrubbing = false
+                            },
+                            valueRange = 0f..currentChapterDurationMs.toFloat(),
+                            enabled = currentChapter != null && currentChapterDurationMs > 0L,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
-                                text = "Chapter preview",
-                                style = MaterialTheme.typography.titleMedium,
+                                text = formatPlaybackTime(displayedPositionMs),
+                                style = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
-                                text = chapter.text.take(260),
+                                text = formatPlaybackTime(currentChapterDurationMs),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 6,
-                                overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                    }
+                }
+                Crossfade(
+                    targetState = currentChapter,
+                    label = "player-chapter-preview",
+                ) { chapter ->
+                    chapter?.let {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            ),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .animateContentSize()
+                                    .padding(18.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    text = "Chapter preview",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = it.text.take(260),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 6,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
@@ -214,6 +309,9 @@ fun PlayerScreen(
 
 @Composable
 private fun PlayerHeroCard(
+    documentTitle: String?,
+    documentSourceUri: String?,
+    documentMimeType: String?,
     chapterTitle: String,
     chapterIndex: Int,
     chapterCount: Int,
@@ -233,6 +331,7 @@ private fun PlayerHeroCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -240,19 +339,27 @@ private fun PlayerHeroCard(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .semantics {
-                            contentDescription = "Current chapter artwork placeholder"
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = chapterIndex.toString(),
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                if (documentTitle != null && documentSourceUri != null && documentMimeType != null) {
+                    PlayerArtwork(
+                        title = documentTitle,
+                        sourceUri = documentSourceUri,
+                        mimeType = documentMimeType,
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(128.dp)
+                            .semantics {
+                                contentDescription = "Current chapter artwork placeholder"
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = chapterIndex.toString(),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
             Text(
@@ -260,6 +367,13 @@ private fun PlayerHeroCard(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
+            documentTitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 text = chapterTitle,
                 style = MaterialTheme.typography.headlineSmall,
@@ -313,6 +427,67 @@ private fun PlayerHeroCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PlayerArtwork(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+) {
+    val bitmap by rememberDocumentArtworkBitmap(
+        title = title,
+        sourceUri = sourceUri,
+        mimeType = mimeType,
+    )
+    if (bitmap != null) {
+        Image(
+            bitmap = requireNotNull(bitmap).asImageBitmap(),
+            contentDescription = "$title cover art",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(width = 144.dp, height = 192.dp)
+                .clip(MaterialTheme.shapes.large),
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(width = 144.dp, height = 192.dp)
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = title.take(2).uppercase(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberDocumentArtworkBitmap(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+): androidx.compose.runtime.State<Bitmap?> {
+    val context = LocalContext.current
+    return produceState<Bitmap?>(
+        initialValue = null,
+        key1 = title,
+        key2 = sourceUri,
+        key3 = mimeType,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            DocumentArtworkLoader.load(
+                context = context,
+                sourceUri = sourceUri,
+                mimeType = mimeType,
+                title = title,
+            )
         }
     }
 }

@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(project(":core-ai"))
     implementation(project(":core-data"))
+    implementation(project(":core-parser"))
 
     kapt(libs.hilt.android.compiler)
 

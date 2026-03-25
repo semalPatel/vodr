@@ -1,7 +1,11 @@
 package com.vodr.app.navigation
 
+import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,11 +13,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -42,9 +52,12 @@ import com.vodr.library.ui.LibraryScreen
 import com.vodr.library.settings.SettingsScreen
 import com.vodr.library.settings.SettingsUiState
 import com.vodr.library.settings.SettingsViewModel
+import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.player.ui.PlayerScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 sealed interface VodrRoute {
     val route: String
@@ -112,7 +125,10 @@ fun VodrNavHost(
             composable(VodrRoute.Library.route) {
                 LibraryScreen(
                     viewModel = libraryViewModel,
-                    continueListeningTitle = playerState.currentChapter?.title,
+                    continueListeningDocumentTitle = generationState.activeDocument?.displayName,
+                    continueListeningDocumentSourceUri = generationState.activeDocument?.sourceUri,
+                    continueListeningDocumentMimeType = generationState.activeDocument?.mimeType,
+                    continueListeningChapterTitle = playerState.currentChapter?.title,
                     continueListeningProgress = playbackProgress,
                     continueListeningStatus = playerState.playbackStatus.toMiniPlayerLabel(),
                     onOpenGenerate = {
@@ -161,6 +177,9 @@ fun VodrNavHost(
             composable(VodrRoute.Player.route) {
                 PlayerScreen(
                     queue = generationState.queue,
+                    documentTitle = generationState.activeDocument?.displayName,
+                    documentSourceUri = generationState.activeDocument?.sourceUri,
+                    documentMimeType = generationState.activeDocument?.mimeType,
                     personalizationProviderLabel = generationState.runtimeSummary
                         ?.personalizationProvider
                         ?.toDisplayName(),
@@ -177,7 +196,10 @@ fun VodrNavHost(
 
         if (showMiniPlayer) {
             MiniPlayerBar(
-                title = playerState.currentChapter?.title.orEmpty(),
+                documentTitle = generationState.activeDocument?.displayName.orEmpty(),
+                documentSourceUri = generationState.activeDocument?.sourceUri,
+                documentMimeType = generationState.activeDocument?.mimeType,
+                chapterTitle = playerState.currentChapter?.title.orEmpty(),
                 progress = playbackProgress,
                 status = playerState.playbackStatus.toMiniPlayerLabel(),
                 isPlaying = playerState.playbackStatus == PlaybackStatus.PLAYING ||
@@ -209,7 +231,10 @@ private fun SettingsUiState.toPersonalizationPreferences(): PersonalizationPrefe
 
 @Composable
 private fun MiniPlayerBar(
-    title: String,
+    documentTitle: String,
+    documentSourceUri: String?,
+    documentMimeType: String?,
+    chapterTitle: String,
     progress: Float,
     status: String,
     isPlaying: Boolean,
@@ -230,6 +255,7 @@ private fun MiniPlayerBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -238,6 +264,16 @@ private fun MiniPlayerBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (documentSourceUri != null && documentMimeType != null) {
+                    MiniPlayerArtwork(
+                        title = documentTitle,
+                        sourceUri = documentSourceUri,
+                        mimeType = documentMimeType,
+                        modifier = Modifier
+                            .size(width = 52.dp, height = 68.dp)
+                            .padding(end = 12.dp),
+                    )
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -248,9 +284,16 @@ private fun MiniPlayerBar(
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = title,
+                        text = documentTitle,
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = chapterTitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = status,
@@ -273,6 +316,66 @@ private fun MiniPlayerBar(
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiniPlayerArtwork(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+    modifier: Modifier = Modifier,
+) {
+    val bitmap by rememberDocumentArtworkBitmap(
+        title = title,
+        sourceUri = sourceUri,
+        mimeType = mimeType,
+    )
+    if (bitmap != null) {
+        Image(
+            bitmap = requireNotNull(bitmap).asImageBitmap(),
+            contentDescription = "$title cover art",
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+                .clip(MaterialTheme.shapes.medium),
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = title.take(2).uppercase(),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberDocumentArtworkBitmap(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+): androidx.compose.runtime.State<Bitmap?> {
+    val context = LocalContext.current
+    return produceState<Bitmap?>(
+        initialValue = null,
+        key1 = title,
+        key2 = sourceUri,
+        key3 = mimeType,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            DocumentArtworkLoader.load(
+                context = context,
+                sourceUri = sourceUri,
+                mimeType = mimeType,
+                title = title,
             )
         }
     }

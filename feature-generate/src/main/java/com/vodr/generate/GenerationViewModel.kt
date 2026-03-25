@@ -20,6 +20,13 @@ data class GenerationUiState(
     val error: GenerationError? = null,
     val runtimeSummary: GenerationRuntimeSummary? = null,
     val phase: GenerationPhase = GenerationPhase.IDLE,
+    val activeDocument: GeneratedDocumentSummary? = null,
+)
+
+data class GeneratedDocumentSummary(
+    val displayName: String,
+    val sourceUri: String,
+    val mimeType: String,
 )
 
 class GenerationViewModel(
@@ -43,6 +50,7 @@ class GenerationViewModel(
                     error = null,
                     runtimeSummary = null,
                     phase = GenerationPhase.PREPARING_INPUT,
+                    activeDocument = null,
                 )
             }
             val result = runCatching {
@@ -73,6 +81,11 @@ class GenerationViewModel(
                             error = GenerationError.EmptyResult,
                             runtimeSummary = output.runtimeSummary,
                             phase = GenerationPhase.READY,
+                            activeDocument = GeneratedDocumentSummary(
+                                displayName = document.displayName,
+                                sourceUri = document.sourceUri,
+                                mimeType = document.mimeType,
+                            ),
                         )
                     } else {
                         GenerationUiState(
@@ -81,6 +94,11 @@ class GenerationViewModel(
                             error = null,
                             runtimeSummary = output.runtimeSummary,
                             phase = GenerationPhase.READY,
+                            activeDocument = GeneratedDocumentSummary(
+                                displayName = document.displayName,
+                                sourceUri = document.sourceUri,
+                                mimeType = document.mimeType,
+                            ),
                         )
                     }
                 },
@@ -95,6 +113,7 @@ class GenerationViewModel(
                         },
                         runtimeSummary = null,
                         phase = GenerationPhase.IDLE,
+                        activeDocument = null,
                     )
                 },
             )
@@ -106,6 +125,7 @@ class GenerationViewModel(
             it.copy(
                 queue = emptyList(),
                 phase = GenerationPhase.IDLE,
+                activeDocument = null,
             )
         }
     }

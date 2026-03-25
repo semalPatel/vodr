@@ -1,12 +1,15 @@
 package com.vodr.library.ui
 
+import android.graphics.Bitmap
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,27 +40,35 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vodr.library.ImportDocumentRequest
 import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
+import com.vodr.parser.DocumentArtworkLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun LibraryScreen(
     viewModel: LibraryViewModel,
-    continueListeningTitle: String? = null,
+    continueListeningDocumentTitle: String? = null,
+    continueListeningDocumentSourceUri: String? = null,
+    continueListeningDocumentMimeType: String? = null,
+    continueListeningChapterTitle: String? = null,
     continueListeningProgress: Float = 0f,
     continueListeningStatus: String? = null,
     onOpenGenerate: () -> Unit = {},
@@ -201,9 +212,15 @@ fun LibraryScreen(
                     isImporting = state.isImporting,
                     onOpenGenerate = onOpenGenerate,
                 )
-                if (continueListeningTitle != null) {
+                if (continueListeningDocumentTitle != null &&
+                    continueListeningDocumentSourceUri != null &&
+                    continueListeningDocumentMimeType != null
+                ) {
                     ContinueListeningCard(
-                        title = continueListeningTitle,
+                        documentTitle = continueListeningDocumentTitle,
+                        documentSourceUri = continueListeningDocumentSourceUri,
+                        documentMimeType = continueListeningDocumentMimeType,
+                        chapterTitle = continueListeningChapterTitle,
                         progress = continueListeningProgress,
                         status = continueListeningStatus ?: "Ready",
                         onResumePlayback = onResumePlayback,
@@ -236,6 +253,7 @@ fun LibraryScreen(
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .animateContentSize()
                                         .clickable(onClick = onOpenGenerate),
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -266,6 +284,7 @@ private fun LibraryHeroCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -302,7 +321,10 @@ private fun LibraryHeroCard(
 
 @Composable
 private fun ContinueListeningCard(
-    title: String,
+    documentTitle: String,
+    documentSourceUri: String,
+    documentMimeType: String,
+    chapterTitle: String?,
     progress: Float,
     status: String,
     onResumePlayback: () -> Unit,
@@ -312,33 +334,55 @@ private fun ContinueListeningCard(
             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.68f),
         ),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Continue listening",
-                style = MaterialTheme.typography.titleMedium,
+            DocumentArtworkThumbnail(
+                title = documentTitle,
+                sourceUri = documentSourceUri,
+                mimeType = documentMimeType,
+                modifier = Modifier.size(width = 70.dp, height = 96.dp),
             )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            androidx.compose.material3.LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            TextButton(onClick = onResumePlayback) {
-                Text(text = "Open player")
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Continue listening",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = documentTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                chapterTitle?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(onClick = onResumePlayback) {
+                    Text(text = "Open player")
+                }
             }
         }
     }
@@ -382,25 +426,17 @@ private fun LibraryDocumentCardContent(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize()
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(width = 56.dp, height = 72.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = document.metadata.displayName
-                    .take(2)
-                    .uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
+        DocumentArtworkThumbnail(
+            title = document.metadata.displayName,
+            sourceUri = document.metadata.sourceUri,
+            mimeType = document.metadata.mimeType,
+            modifier = Modifier.size(width = 56.dp, height = 72.dp),
+        )
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -432,6 +468,65 @@ private fun LibraryDocumentCardContent(
             }
         }
     }
+}
+
+@Composable
+private fun DocumentArtworkThumbnail(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+    modifier: Modifier = Modifier,
+) {
+    val bitmap by rememberDocumentArtworkBitmap(
+        title = title,
+        sourceUri = sourceUri,
+        mimeType = mimeType,
+    )
+    if (bitmap != null) {
+        Image(
+            bitmap = requireNotNull(bitmap).asImageBitmap(),
+            contentDescription = "$title cover art",
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(MaterialTheme.shapes.medium),
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = title.take(2).uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberDocumentArtworkBitmap(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+) : androidx.compose.runtime.State<Bitmap?> {
+    val context = LocalContext.current
+    return produceState<Bitmap?>(
+        initialValue = null,
+        key1 = title,
+        key2 = sourceUri,
+        key3 = mimeType,
+    ) {
+    value = withContext(Dispatchers.IO) {
+        DocumentArtworkLoader.load(
+            context = context,
+            sourceUri = sourceUri,
+            mimeType = mimeType,
+            title = title,
+        )
+    }
+}
 }
 
 private fun buildDocumentSubtitle(document: ImportedDocument): String {
