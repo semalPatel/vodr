@@ -1,7 +1,6 @@
 package com.vodr.app.navigation
 
 import android.net.Uri
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,6 +56,7 @@ import com.vodr.player.ui.PlayerScreen
 import com.vodr.ui.CompactPlaybackIconButton
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.theme.VodrUiTheme
+import com.vodr.ui.theme.vodrAnimateContentSize
 
 sealed interface VodrRoute {
     val route: String
@@ -306,7 +306,7 @@ private fun MiniPlayerBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .vodrAnimateContentSize()
                 .padding(
                     horizontal = spacing.miniPlayerInsetHorizontal,
                     vertical = spacing.miniPlayerContentVertical,

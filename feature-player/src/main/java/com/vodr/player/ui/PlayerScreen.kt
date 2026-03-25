@@ -1,7 +1,5 @@
 package com.vodr.player.ui
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,8 +61,11 @@ import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.theme.VodrCrossfade
+import com.vodr.ui.theme.VodrMotionSpecs
 import com.vodr.ui.theme.VodrSurfaceStyles
 import com.vodr.ui.theme.VodrUiTheme
+import com.vodr.ui.theme.vodrAnimateContentSize
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,10 +103,12 @@ fun PlayerScreen(
     }
     val animatedChapterProgress by animateFloatAsState(
         targetValue = chapterProgressTarget,
+        animationSpec = VodrMotionSpecs.progressFloat(),
         label = "player-chapter-progress",
     )
     val animatedListeningProgress by animateFloatAsState(
         targetValue = chapterListeningProgressTarget,
+        animationSpec = VodrMotionSpecs.progressFloat(),
         label = "player-listening-progress",
     )
     val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
@@ -155,7 +158,7 @@ fun PlayerScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .animateContentSize()
+                            .vodrAnimateContentSize()
                             .padding(spacing.md + spacing.xxs),
                         verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
@@ -203,7 +206,7 @@ fun PlayerScreen(
                         }
                     }
                 }
-                Crossfade(
+                VodrCrossfade(
                     targetState = currentChapter,
                     label = "player-chapter-preview",
                 ) { chapter ->
@@ -214,7 +217,7 @@ fun PlayerScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .animateContentSize()
+                                    .vodrAnimateContentSize()
                                     .padding(spacing.md + spacing.xxs),
                                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
                             ) {
@@ -347,7 +350,7 @@ private fun ListeningSessionsCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .vodrAnimateContentSize()
                 .padding(spacing.md + spacing.xxs),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
@@ -565,7 +568,7 @@ private fun PlayerHeroCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .vodrAnimateContentSize()
                 .padding(spacing.lg),
             verticalArrangement = Arrangement.spacedBy(spacing.sm + spacing.xxs),
         ) {

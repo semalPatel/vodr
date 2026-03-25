@@ -1,7 +1,5 @@
 package com.vodr.generate.ui
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,8 +34,11 @@ import com.vodr.generate.GenerationPhase
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
+import com.vodr.ui.theme.VodrCrossfade
+import com.vodr.ui.theme.VodrMotionSpecs
 import com.vodr.ui.theme.VodrSurfaceStyles
 import com.vodr.ui.theme.VodrUiTheme
+import com.vodr.ui.theme.vodrAnimateContentSize
 
 data class GenerationSourceDocument(
     val id: String,
@@ -156,16 +157,17 @@ private fun GenerationStatusCard(
     ) {
         val animatedProgress by animateFloatAsState(
             targetValue = generationState.phase.progress,
+            animationSpec = VodrMotionSpecs.progressFloat(),
             label = "generation-phase-progress",
         )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .vodrAnimateContentSize()
                 .padding(spacing.md),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Crossfade(
+            VodrCrossfade(
                 targetState = generationState.phase,
                 label = "generation-phase-copy",
             ) { phase ->

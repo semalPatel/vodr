@@ -179,6 +179,9 @@ object VodrUiTheme {
 
     val elevation: VodrElevation
         @Composable get() = LocalVodrElevation.current
+
+    val motion: VodrMotion
+        @Composable get() = LocalVodrMotion.current
 }
 
 @Composable
@@ -190,6 +193,7 @@ fun ProvideVodrUiTheme(
         LocalVodrSizes provides VodrSizes(),
         LocalVodrAlpha provides VodrAlpha(),
         LocalVodrElevation provides VodrElevation(),
+        LocalVodrMotion provides VodrMotion(),
         content = content,
     )
 }

@@ -3,9 +3,6 @@ package com.vodr.library.ui
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,8 +57,11 @@ import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.theme.VodrAnimatedVisibility
+import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrSurfaceStyles
 import com.vodr.ui.theme.VodrUiTheme
+import com.vodr.ui.theme.vodrAnimateContentSize
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -174,7 +174,7 @@ fun LibraryScreen(
                 ) {
                     Text(text = if (state.isImporting) "Importing..." else "Import PDF/EPUB")
                 }
-                AnimatedVisibility(visible = state.documents.isNotEmpty()) {
+                VodrAnimatedVisibility(visible = state.documents.isNotEmpty()) {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
@@ -274,7 +274,7 @@ fun LibraryScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                Crossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
+                VodrCrossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
                     if (isEmpty) {
                         EmptyLibraryCard(
                             onAddBook = { showAddSheet = true },
@@ -291,7 +291,7 @@ fun LibraryScreen(
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .animateContentSize()
+                                        .vodrAnimateContentSize()
                                         .clickable(onClick = onOpenGenerate),
                                     colors = VodrSurfaceStyles.subtleCardColors(),
                                 ) {
@@ -332,7 +332,7 @@ private fun LibraryHeroCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .vodrAnimateContentSize()
                 .padding(spacing.lg),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
@@ -387,7 +387,7 @@ private fun ContinueListeningCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .vodrAnimateContentSize()
                 .padding(spacing.md + spacing.xxs),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm + spacing.xxs),
             verticalAlignment = Alignment.CenterVertically,
@@ -530,7 +530,7 @@ private fun SessionShelfSection(
                 Card(
                     modifier = Modifier
                         .width(sizes.libraryShelfCardWidth)
-                        .animateContentSize()
+                        .vodrAnimateContentSize()
                         .clickable { onOpenSession(session.sessionId) },
                     colors = VodrSurfaceStyles.shelfCardColors(emphasized = emphasized),
                 ) {
@@ -689,7 +689,7 @@ private fun LibraryDocumentCardContent(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize()
+            .vodrAnimateContentSize()
             .padding(spacing.md),
         horizontalArrangement = Arrangement.spacedBy(spacing.md),
         verticalAlignment = Alignment.CenterVertically,
