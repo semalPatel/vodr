@@ -11,6 +11,12 @@ data class PlaybackChapter(
     val text: String,
 )
 
+data class PlaybackDocument(
+    val title: String,
+    val sourceUri: String,
+    val mimeType: String,
+)
+
 enum class PlaybackStatus {
     IDLE,
     PREPARING,
@@ -21,6 +27,7 @@ enum class PlaybackStatus {
 
 data class PlaybackState(
     val queue: List<PlaybackChapter> = emptyList(),
+    val activeDocument: PlaybackDocument? = null,
     val currentChapterIndex: Int = 0,
     val resumePositionMs: Long = 0L,
     val currentChapterDurationMs: Long = 0L,
@@ -43,6 +50,7 @@ interface VodrPlayerController {
 
     fun updateQueue(
         queue: List<PlaybackChapter>,
+        activeDocument: PlaybackDocument? = null,
         currentChapterIndex: Int = 0,
         resumePositionMs: Long = 0L,
     )
@@ -72,6 +80,7 @@ class InMemoryVodrPlayerController : VodrPlayerController {
 
     override fun updateQueue(
         queue: List<PlaybackChapter>,
+        activeDocument: PlaybackDocument?,
         currentChapterIndex: Int,
         resumePositionMs: Long,
     ) {
@@ -79,6 +88,7 @@ class InMemoryVodrPlayerController : VodrPlayerController {
             val clampedIndex = clampChapterIndex(queue, currentChapterIndex)
             current.copy(
                 queue = queue,
+                activeDocument = activeDocument ?: current.activeDocument,
                 currentChapterIndex = clampedIndex,
                 resumePositionMs = resumePositionMs.coerceAtLeast(0L),
                 currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->

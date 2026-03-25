@@ -53,6 +53,7 @@ import com.vodr.library.settings.SettingsScreen
 import com.vodr.library.settings.SettingsUiState
 import com.vodr.library.settings.SettingsViewModel
 import com.vodr.parser.DocumentArtworkLoader
+import com.vodr.playback.PlaybackDocument
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.player.ui.PlayerScreen
@@ -110,7 +111,10 @@ fun VodrNavHost(
 
     LaunchedEffect(generationState.queue) {
         if (generationState.queue.isNotEmpty()) {
-            playerViewModel.updateQueue(generationState.queue)
+            playerViewModel.updateQueue(
+                queue = generationState.queue,
+                activeDocument = generationState.activeDocument?.toPlaybackDocument(),
+            )
         }
     }
 
@@ -125,9 +129,9 @@ fun VodrNavHost(
             composable(VodrRoute.Library.route) {
                 LibraryScreen(
                     viewModel = libraryViewModel,
-                    continueListeningDocumentTitle = generationState.activeDocument?.displayName,
-                    continueListeningDocumentSourceUri = generationState.activeDocument?.sourceUri,
-                    continueListeningDocumentMimeType = generationState.activeDocument?.mimeType,
+                    continueListeningDocumentTitle = playerState.activeDocument?.title,
+                    continueListeningDocumentSourceUri = playerState.activeDocument?.sourceUri,
+                    continueListeningDocumentMimeType = playerState.activeDocument?.mimeType,
                     continueListeningChapterTitle = playerState.currentChapter?.title,
                     continueListeningProgress = playbackProgress,
                     continueListeningStatus = playerState.playbackStatus.toMiniPlayerLabel(),
@@ -177,9 +181,9 @@ fun VodrNavHost(
             composable(VodrRoute.Player.route) {
                 PlayerScreen(
                     queue = generationState.queue,
-                    documentTitle = generationState.activeDocument?.displayName,
-                    documentSourceUri = generationState.activeDocument?.sourceUri,
-                    documentMimeType = generationState.activeDocument?.mimeType,
+                    documentTitle = playerState.activeDocument?.title,
+                    documentSourceUri = playerState.activeDocument?.sourceUri,
+                    documentMimeType = playerState.activeDocument?.mimeType,
                     personalizationProviderLabel = generationState.runtimeSummary
                         ?.personalizationProvider
                         ?.toDisplayName(),
@@ -196,9 +200,9 @@ fun VodrNavHost(
 
         if (showMiniPlayer) {
             MiniPlayerBar(
-                documentTitle = generationState.activeDocument?.displayName.orEmpty(),
-                documentSourceUri = generationState.activeDocument?.sourceUri,
-                documentMimeType = generationState.activeDocument?.mimeType,
+                documentTitle = playerState.activeDocument?.title.orEmpty(),
+                documentSourceUri = playerState.activeDocument?.sourceUri,
+                documentMimeType = playerState.activeDocument?.mimeType,
                 chapterTitle = playerState.currentChapter?.title.orEmpty(),
                 progress = playbackProgress,
                 status = playerState.playbackStatus.toMiniPlayerLabel(),
@@ -226,6 +230,14 @@ private fun SettingsUiState.toPersonalizationPreferences(): PersonalizationPrefe
             modelName = customModelName,
         ),
         offlineOnly = offlineOnly,
+    )
+}
+
+private fun com.vodr.generate.GeneratedDocumentSummary.toPlaybackDocument(): PlaybackDocument {
+    return PlaybackDocument(
+        title = displayName,
+        sourceUri = sourceUri,
+        mimeType = mimeType,
     )
 }
 

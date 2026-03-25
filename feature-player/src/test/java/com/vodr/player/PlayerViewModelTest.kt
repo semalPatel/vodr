@@ -1,6 +1,7 @@
 package com.vodr.player
 
 import com.vodr.playback.PlaybackChapter
+import com.vodr.playback.PlaybackDocument
 import com.vodr.playback.PlaybackState
 import com.vodr.playback.PlaybackStatus
 import com.vodr.playback.VodrPlayerController
@@ -118,6 +119,40 @@ class PlayerViewModelTest {
         assertTrue(controller.selectChapterCalled)
     }
 
+    @Test
+    fun updatingQueueForNewDocument_resetsChapterAndResumePosition() {
+        val viewModel = PlayerViewModel(FakeVodrPlayerController())
+
+        viewModel.updateQueue(
+            queue = listOf(
+                PlaybackChapter(id = "chapter-1", title = "One", text = "Chapter one"),
+                PlaybackChapter(id = "chapter-2", title = "Two", text = "Chapter two"),
+            ),
+            activeDocument = PlaybackDocument(
+                title = "First Book",
+                sourceUri = "content://first",
+                mimeType = "application/pdf",
+            ),
+        )
+        viewModel.selectChapter(1)
+        viewModel.updateResumePosition(12_000L)
+
+        viewModel.updateQueue(
+            queue = listOf(
+                PlaybackChapter(id = "chapter-3", title = "Three", text = "Chapter three"),
+                PlaybackChapter(id = "chapter-4", title = "Four", text = "Chapter four"),
+            ),
+            activeDocument = PlaybackDocument(
+                title = "Second Book",
+                sourceUri = "content://second",
+                mimeType = "application/epub+zip",
+            ),
+        )
+
+        assertEquals(0, viewModel.state.value.currentChapterIndex)
+        assertEquals(0L, viewModel.state.value.resumePositionMs)
+    }
+
     private class FakeVodrPlayerController : VodrPlayerController {
         private val mutableState = MutableStateFlow(PlaybackState())
         override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()
@@ -126,11 +161,13 @@ class PlayerViewModelTest {
 
         override fun updateQueue(
             queue: List<PlaybackChapter>,
+            activeDocument: PlaybackDocument?,
             currentChapterIndex: Int,
             resumePositionMs: Long,
         ) {
             mutableState.value = mutableState.value.copy(
                 queue = queue,
+                activeDocument = activeDocument,
                 currentChapterIndex = if (queue.isEmpty()) {
                     0
                 } else {

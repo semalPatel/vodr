@@ -6,14 +6,18 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -183,6 +187,17 @@ fun PlayerScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        if (state.queue.isNotEmpty()) {
+                            Text(
+                                text = "Book timeline",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            ChapterTimelineMarkers(
+                                queue = state.queue,
+                                currentChapterIndex = state.currentChapterIndex,
+                                onSelectChapter = viewModel::selectChapter,
+                            )
+                        }
                     }
                 }
                 Crossfade(
@@ -302,6 +317,52 @@ fun PlayerScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterTimelineMarkers(
+    queue: List<PlaybackChapter>,
+    currentChapterIndex: Int,
+    onSelectChapter: (Int) -> Unit,
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(
+            items = queue,
+            key = { _, chapter -> chapter.id },
+        ) { index, chapter ->
+            val isSelected = index == currentChapterIndex
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 34.dp, height = if (isSelected) 18.dp else 12.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.28f)
+                            },
+                        )
+                        .clickable { onSelectChapter(index) },
+                )
+                Text(
+                    text = "${index + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                )
             }
         }
     }

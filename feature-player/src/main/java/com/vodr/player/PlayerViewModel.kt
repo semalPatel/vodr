@@ -2,6 +2,7 @@ package com.vodr.player
 
 import androidx.lifecycle.ViewModel
 import com.vodr.playback.PlaybackChapter
+import com.vodr.playback.PlaybackDocument
 import com.vodr.playback.PlaybackState
 import com.vodr.playback.VodrPlayerController
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,11 +15,16 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
     val state: StateFlow<PlaybackState> = controller.state
 
-    fun updateQueue(queue: List<PlaybackChapter>) {
+    fun updateQueue(
+        queue: List<PlaybackChapter>,
+        activeDocument: PlaybackDocument? = state.value.activeDocument,
+    ) {
+        val isNewDocument = activeDocument != null && activeDocument != state.value.activeDocument
         controller.updateQueue(
             queue = queue,
-            currentChapterIndex = state.value.currentChapterIndex,
-            resumePositionMs = state.value.resumePositionMs,
+            activeDocument = activeDocument,
+            currentChapterIndex = if (isNewDocument) 0 else state.value.currentChapterIndex,
+            resumePositionMs = if (isNewDocument) 0L else state.value.resumePositionMs,
         )
     }
 

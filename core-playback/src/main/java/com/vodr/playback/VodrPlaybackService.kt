@@ -100,6 +100,7 @@ class VodrPlaybackService : MediaSessionService() {
             ACTION_PLAY -> if (player.mediaItemCount > 0) player.play() else syncQueueWithPlayer()
             ACTION_PAUSE -> player.pause()
             ACTION_NEXT -> {
+                ensureQueueLoaded()
                 if (player.hasNextMediaItem()) {
                     player.seekToNextMediaItem()
                     if (!player.isPlaying && controller.snapshot().playbackStatus == PlaybackStatus.PLAYING) {
@@ -108,6 +109,7 @@ class VodrPlaybackService : MediaSessionService() {
                 }
             }
             ACTION_PREVIOUS -> {
+                ensureQueueLoaded()
                 if (player.currentPosition > RESTART_THRESHOLD_MS) {
                     player.seekTo(0L)
                 } else if (player.hasPreviousMediaItem()) {
@@ -117,6 +119,7 @@ class VodrPlaybackService : MediaSessionService() {
                 }
             }
             ACTION_SEEK_FORWARD -> {
+                ensureQueueLoaded()
                 val incrementMs = commandIntent?.getLongExtra(
                     EXTRA_SEEK_INCREMENT_MS,
                     PlaybackState.DEFAULT_SEEK_INCREMENT_MS,
@@ -124,6 +127,7 @@ class VodrPlaybackService : MediaSessionService() {
                 player.seekTo(player.currentPosition + incrementMs)
             }
             ACTION_SEEK_BACKWARD -> {
+                ensureQueueLoaded()
                 val incrementMs = commandIntent?.getLongExtra(
                     EXTRA_SEEK_INCREMENT_MS,
                     PlaybackState.DEFAULT_SEEK_INCREMENT_MS,
@@ -131,10 +135,12 @@ class VodrPlaybackService : MediaSessionService() {
                 player.seekTo((player.currentPosition - incrementMs).coerceAtLeast(0L))
             }
             ACTION_SEEK_TO_POSITION -> {
+                ensureQueueLoaded()
                 val positionMs = commandIntent?.getLongExtra(EXTRA_RESUME_POSITION_MS, 0L) ?: 0L
                 player.seekTo(positionMs.coerceAtLeast(0L))
             }
             ACTION_SET_SPEED -> {
+                ensureQueueLoaded()
                 val playbackSpeed = commandIntent?.getFloatExtra(
                     EXTRA_PLAYBACK_SPEED,
                     PlaybackState.DEFAULT_PLAYBACK_SPEED,
@@ -144,6 +150,7 @@ class VodrPlaybackService : MediaSessionService() {
                 )
             }
             ACTION_SELECT_CHAPTER -> {
+                ensureQueueLoaded()
                 val chapterIndex = commandIntent?.getIntExtra(
                     EXTRA_CHAPTER_INDEX,
                     player.currentMediaItemIndex.coerceAtLeast(0),
@@ -393,6 +400,12 @@ class VodrPlaybackService : MediaSessionService() {
 
     private fun stopProgressUpdates() {
         progressHandler.removeCallbacks(progressUpdater)
+    }
+
+    private fun ensureQueueLoaded() {
+        if (player.mediaItemCount == 0 && controller.snapshot().queue.isNotEmpty()) {
+            syncQueueWithPlayer()
+        }
     }
 
     companion object {

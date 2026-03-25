@@ -18,27 +18,50 @@ import kotlinx.coroutines.flow.update
 @Singleton
 class ForegroundVodrPlayerController @Inject constructor(
     @param:ApplicationContext private val applicationContext: Context,
+    private val sessionStore: PlaybackSessionStore,
 ) : VodrPlayerController {
-    private val mutableState = MutableStateFlow(PlaybackState())
+    private val mutableState = MutableStateFlow(
+        sessionStore.load()?.toPlaybackState() ?: PlaybackState(),
+    )
     override val state: StateFlow<PlaybackState> = mutableState.asStateFlow()
 
     override fun updateQueue(
         queue: List<PlaybackChapter>,
+        activeDocument: PlaybackDocument?,
         currentChapterIndex: Int,
         resumePositionMs: Long,
     ) {
         mutableState.update { current ->
+            val clampedIndex = clampChapterIndex(queue, currentChapterIndex)
             current.copy(
                 queue = queue,
-                currentChapterIndex = clampChapterIndex(queue, currentChapterIndex),
+                activeDocument = activeDocument ?: current.activeDocument,
+                currentChapterIndex = clampedIndex,
                 resumePositionMs = resumePositionMs.coerceAtLeast(0L),
+                currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->
+                    PlaybackEstimator.estimatedDurationMs(
+                        text = chapter.text,
+                        playbackSpeed = current.playbackSpeed,
+                    )
+                } ?: 0L,
+                playbackStatus = if (queue.isEmpty()) PlaybackStatus.IDLE else current.playbackStatus,
                 errorMessage = null,
             )
         }
+        persistCurrentState()
         dispatchAction(VodrPlaybackService.ACTION_SYNC_QUEUE)
     }
 
     override fun play() {
+        if (state.value.queue.isNotEmpty()) {
+            mutableState.update {
+                it.copy(
+                    playbackStatus = PlaybackStatus.PREPARING,
+                    errorMessage = null,
+                )
+            }
+            persistCurrentState()
+        }
         dispatchForegroundAction(VodrPlaybackService.ACTION_PLAY)
     }
 
@@ -98,6 +121,7 @@ class ForegroundVodrPlayerController @Inject constructor(
 
     internal fun updateFromService(state: PlaybackState) {
         mutableState.value = state
+        persistCurrentState()
     }
 
     private fun dispatchForegroundAction(action: String) {
@@ -143,6 +167,10 @@ class ForegroundVodrPlayerController @Inject constructor(
         } else {
             chapterIndex.coerceIn(0, queue.lastIndex)
         }
+    }
+
+    private fun persistCurrentState() {
+        state.value.toPlaybackSessionSnapshot()?.let(sessionStore::save) ?: sessionStore.clear()
     }
 }
 
