@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,8 +37,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,11 +58,15 @@ import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrMotionSpecs
 import com.vodr.ui.theme.VodrSurfaceStyles
 import com.vodr.ui.theme.VodrUiTheme
 import com.vodr.ui.theme.vodrAnimateContentSize
+import com.vodr.ui.VodrMetaChip
+import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrSectionHeader
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,7 +120,7 @@ fun PlayerScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(title = { Text(text = "Player") })
+            VodrScreenTopBar(title = "Player")
         },
     ) { contentPadding ->
         Surface(modifier = Modifier.padding(contentPadding)) {
@@ -162,9 +163,8 @@ fun PlayerScreen(
                             .padding(spacing.md + spacing.xxs),
                         verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
-                        Text(
-                            text = "Playback position",
-                            style = MaterialTheme.typography.titleMedium,
+                        VodrSectionHeader(
+                            title = "Playback position",
                         )
                         Slider(
                             value = displayedPositionMs.toFloat(),
@@ -194,9 +194,8 @@ fun PlayerScreen(
                             )
                         }
                         if (state.queue.isNotEmpty()) {
-                            Text(
-                                text = "Book timeline",
-                                style = MaterialTheme.typography.titleSmall,
+                            VodrSectionHeader(
+                                title = "Book timeline",
                             )
                             ChapterTimelineMarkers(
                                 queue = state.queue,
@@ -221,9 +220,8 @@ fun PlayerScreen(
                                     .padding(spacing.md + spacing.xxs),
                                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
                             ) {
-                                Text(
-                                    text = "Chapter preview",
-                                    style = MaterialTheme.typography.titleMedium,
+                                VodrSectionHeader(
+                                    title = "Chapter preview",
                                 )
                                 Text(
                                     text = it.text.take(260),
@@ -301,9 +299,8 @@ fun PlayerScreen(
                     )
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    Text(
-                        text = "Playback speed",
-                        style = MaterialTheme.typography.titleMedium,
+                    VodrSectionHeader(
+                        title = "Playback speed",
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                         listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
@@ -354,14 +351,9 @@ private fun ListeningSessionsCard(
                 .padding(spacing.md + spacing.xxs),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Text(
-                text = "Listening sessions",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = "Switch between saved books and keep favorites pinned near the top.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            VodrSectionHeader(
+                title = "Listening sessions",
+                subtitle = "Switch between saved books and keep favorites pinned near the top.",
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 itemsIndexed(
@@ -425,31 +417,21 @@ private fun ListeningSessionsCard(
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                                 if (session.isFavorite) {
-                                    AssistChip(
-                                        onClick = {},
-                                        label = { Text(text = "Favorite") },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Star,
-                                                contentDescription = null,
-                                            )
-                                        },
+                                    VodrMetaChip(
+                                        label = "Favorite",
+                                        leadingIcon = Icons.Rounded.Star,
                                     )
                                 }
-                                TextButton(
+                                VodrInlineAction(
+                                    label = if (isCurrent) "Current session" else "Switch",
                                     onClick = { onRestoreSession(session.sessionId) },
                                     enabled = !isCurrent,
-                                ) {
-                                    Icon(
-                                        imageVector = if (isCurrent) {
-                                            Icons.Rounded.PlayArrow
-                                        } else {
-                                            Icons.AutoMirrored.Rounded.MenuBook
-                                        },
-                                        contentDescription = null,
-                                    )
-                                    Text(text = if (isCurrent) "Current session" else "Switch")
-                                }
+                                    icon = if (isCurrent) {
+                                        Icons.Rounded.PlayArrow
+                                    } else {
+                                        Icons.AutoMirrored.Rounded.MenuBook
+                                    },
+                                )
                                 FilterChip(
                                     selected = session.isFavorite,
                                     onClick = {
@@ -471,13 +453,11 @@ private fun ListeningSessionsCard(
                                     },
                                 )
                                 if (!isCurrent) {
-                                    TextButton(onClick = { onRemoveSession(session.sessionId) }) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.DeleteOutline,
-                                            contentDescription = null,
-                                        )
-                                        Text(text = "Remove")
-                                    }
+                                    VodrInlineAction(
+                                        label = "Remove",
+                                        onClick = { onRemoveSession(session.sessionId) },
+                                        icon = Icons.Rounded.DeleteOutline,
+                                    )
                                 }
                             }
                         }
@@ -642,15 +622,11 @@ private fun PlayerHeroCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(text = if (isVoiceReady) "Voice Ready" else "Preparing Voice")
-                    },
+                VodrMetaChip(
+                    label = if (isVoiceReady) "Voice Ready" else "Preparing Voice",
                 )
-                AssistChip(
-                    onClick = {},
-                    label = { Text(text = playbackStatusLabel) },
+                VodrMetaChip(
+                    label = playbackStatusLabel,
                 )
             }
             if (runtimeMetadata?.personalizationProviderLabel != null ||
@@ -658,15 +634,13 @@ private fun PlayerHeroCard(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     runtimeMetadata.personalizationProviderLabel?.let { label ->
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(text = "AI: $label") },
+                        VodrMetaChip(
+                            label = "AI: $label",
                         )
                     }
                     runtimeMetadata.transcriptionProviderLabel?.let { label ->
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(text = "Transcript: $label") },
+                        VodrMetaChip(
+                            label = "Transcript: $label",
                         )
                     }
                 }

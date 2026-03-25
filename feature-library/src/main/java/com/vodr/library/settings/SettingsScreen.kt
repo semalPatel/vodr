@@ -14,13 +14,14 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.ai.PersonalizationProviderType
+import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.theme.VodrUiTheme
 
 @Composable
@@ -35,7 +36,7 @@ fun SettingsScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(title = { Text(text = "Settings") })
+            VodrScreenTopBar(title = "Settings")
         },
     ) { contentPadding ->
         Surface(modifier = Modifier.padding(contentPadding)) {
@@ -45,9 +46,8 @@ fun SettingsScreen(
                     .padding(spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
-                Text(
-                    text = "Voice",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Voice",
                 )
                 OutlinedTextField(
                     value = state.voice,
@@ -57,9 +57,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
-                Text(
-                    text = "Speech rate: ${"%.2f".format(state.speechRate)}",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Speech rate: ${"%.2f".format(state.speechRate)}",
                 )
                 Slider(
                     value = state.speechRate,
@@ -68,9 +67,8 @@ fun SettingsScreen(
                     },
                     valueRange = 0.5f..2.0f,
                 )
-                Text(
-                    text = "Style",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Style",
                 )
                 OutlinedTextField(
                     value = state.style,
@@ -80,14 +78,9 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
-                Text(
-                    text = "Personalization Provider",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = "Auto prefers device AI first, then your configured local model, then offline fallback.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                VodrSectionHeader(
+                    title = "Personalization Provider",
+                    subtitle = "Auto prefers device AI first, then your configured local model, then offline fallback.",
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     PersonalizationProviderType.entries.forEach { providerType ->

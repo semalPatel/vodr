@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,7 +18,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +32,9 @@ import com.vodr.generate.GenerationPhase
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
+import com.vodr.ui.VodrMetaChip
+import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrMotionSpecs
 import com.vodr.ui.theme.VodrSurfaceStyles
@@ -68,7 +69,7 @@ fun GenerateScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(title = { Text(text = "Generate") })
+            VodrScreenTopBar(title = "Generate")
         },
     ) { contentPadding ->
         Surface(modifier = Modifier.padding(contentPadding)) {
@@ -88,9 +89,8 @@ fun GenerateScreen(
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 GenerationStatusCard(generationState = generationState)
-                Text(
-                    text = "Document",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Document",
                 )
                 documents.forEach { document ->
                     val isSelected = selectedDocumentId == document.id
@@ -111,9 +111,8 @@ fun GenerateScreen(
                     }
                 }
 
-                Text(
-                    text = "Mode",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Mode",
                 )
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -192,51 +191,30 @@ private fun GenerationStatusCard(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = if (generationState.isGenerating) {
-                                "Working"
-                            } else {
-                                "Idle"
-                            },
-                        )
+                VodrMetaChip(
+                    label = if (generationState.isGenerating) {
+                        "Working"
+                    } else {
+                        "Idle"
                     },
                 )
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = when (generationState.phase) {
-                                GenerationPhase.IDLE -> "Awaiting input"
-                                GenerationPhase.READY -> "Queue ready"
-                                else -> "Phase ${(generationState.phase.progress * 100).toInt()}%"
-                            },
-                        )
+                VodrMetaChip(
+                    label = when (generationState.phase) {
+                        GenerationPhase.IDLE -> "Awaiting input"
+                        GenerationPhase.READY -> "Queue ready"
+                        else -> "Phase ${(generationState.phase.progress * 100).toInt()}%"
                     },
                 )
             }
             generationState.runtimeSummary?.let { runtimeSummary ->
-                Text(
-                    text = "Active Providers",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Active Providers",
                 )
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = "Personalization: ${runtimeSummary.personalizationProvider.toDisplayName()}",
-                        )
-                    },
+                VodrMetaChip(
+                    label = "Personalization: ${runtimeSummary.personalizationProvider.toDisplayName()}",
                 )
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = "Transcription: ${runtimeSummary.transcriptionProvider.toDisplayName()}",
-                        )
-                    },
+                VodrMetaChip(
+                    label = "Transcription: ${runtimeSummary.transcriptionProvider.toDisplayName()}",
                 )
                 runtimeSummary.personalizationDetail?.let { detail ->
                     Text(

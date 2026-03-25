@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -37,8 +36,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,7 +53,11 @@ import com.vodr.library.ImportDocumentRequest
 import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 import com.vodr.ui.DocumentArtworkCover
+import com.vodr.ui.VodrInlineAction
+import com.vodr.ui.VodrMetaChip
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.theme.VodrAnimatedVisibility
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrSurfaceStyles
@@ -192,17 +193,15 @@ fun LibraryScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                title = { Text(text = "Library") },
+            VodrScreenTopBar(
+                title = "Library",
                 actions = {
-                    TextButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = null,
-                        )
-                        Text(text = "Settings")
-                    }
-                }
+                    VodrInlineAction(
+                        label = "Settings",
+                        onClick = onOpenSettings,
+                        icon = Icons.Rounded.Settings,
+                    )
+                },
             )
         },
         floatingActionButton = {
@@ -264,9 +263,8 @@ fun LibraryScreen(
                         onToggleFavorite = onToggleRecentSessionFavorite,
                     )
                 }
-                Text(
-                    text = "Recently opened books",
-                    style = MaterialTheme.typography.titleMedium,
+                VodrSectionHeader(
+                    title = "Recently opened books",
                 )
                 if (state.errorMessage != null) {
                     Text(
@@ -353,15 +351,14 @@ private fun LibraryHeroCard(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(text = if (isImporting) "Importing" else "Offline-first")
-                    },
+                VodrMetaChip(
+                    label = if (isImporting) "Importing" else "Offline-first",
                 )
-                TextButton(onClick = onOpenGenerate, enabled = documentCount > 0) {
-                    Text(text = "Open Generate")
-                }
+                VodrInlineAction(
+                    label = "Open Generate",
+                    onClick = onOpenGenerate,
+                    enabled = documentCount > 0,
+                )
             }
         }
     }
@@ -513,14 +510,9 @@ private fun SessionShelfSection(
     val spacing = VodrUiTheme.spacing
     val sizes = VodrUiTheme.sizes
     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        VodrSectionHeader(
+            title = title,
+            subtitle = subtitle,
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             itemsIndexed(
@@ -581,38 +573,28 @@ private fun SessionShelfSection(
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                             if (session.isFavorite) {
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(text = "Favorite") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Star,
-                                            contentDescription = null,
-                                        )
-                                    },
+                                VodrMetaChip(
+                                    label = "Favorite",
+                                    leadingIcon = Icons.Rounded.Star,
                                 )
                             }
                             session.personalizationProviderLabel?.let { label ->
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(text = "AI: $label") },
+                                VodrMetaChip(
+                                    label = "AI: $label",
                                 )
                             }
                             session.transcriptionProviderLabel?.let { label ->
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(text = "Transcript: $label") },
+                                VodrMetaChip(
+                                    label = "Transcript: $label",
                                 )
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                            TextButton(onClick = { onOpenSession(session.sessionId) }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.PlayArrow,
-                                    contentDescription = null,
-                                )
-                                Text(text = "Open")
-                            }
+                            VodrInlineAction(
+                                label = "Open",
+                                onClick = { onOpenSession(session.sessionId) },
+                                icon = Icons.Rounded.PlayArrow,
+                            )
                             FilterChip(
                                 selected = session.isFavorite,
                                 onClick = {
@@ -634,13 +616,11 @@ private fun SessionShelfSection(
                                 },
                             )
                             onRemoveSession?.let { remove ->
-                                TextButton(onClick = { remove(session.sessionId) }) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.DeleteOutline,
-                                        contentDescription = null,
-                                    )
-                                    Text(text = "Remove")
-                                }
+                                VodrInlineAction(
+                                    label = "Remove",
+                                    onClick = { remove(session.sessionId) },
+                                    icon = Icons.Rounded.DeleteOutline,
+                                )
                             }
                         }
                     }
@@ -673,9 +653,10 @@ private fun EmptyLibraryCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = onAddBook) {
-                Text(text = "Import your first book")
-            }
+            VodrInlineAction(
+                label = "Import your first book",
+                onClick = onAddBook,
+            )
         }
     }
 }
@@ -719,17 +700,11 @@ private fun LibraryDocumentCardContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
-                        )
-                    },
+                VodrMetaChip(
+                    label = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
                 )
-                AssistChip(
-                    onClick = {},
-                    label = { Text(text = relativeImportedLabel(document.metadata.importedAtEpochMs)) },
+                VodrMetaChip(
+                    label = relativeImportedLabel(document.metadata.importedAtEpochMs),
                 )
             }
         }
