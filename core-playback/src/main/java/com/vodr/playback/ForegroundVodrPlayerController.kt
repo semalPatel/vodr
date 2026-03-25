@@ -28,6 +28,7 @@ class ForegroundVodrPlayerController @Inject constructor(
     override fun updateQueue(
         queue: List<PlaybackChapter>,
         activeDocument: PlaybackDocument?,
+        runtimeMetadata: PlaybackRuntimeMetadata?,
         currentChapterIndex: Int,
         resumePositionMs: Long,
     ) {
@@ -36,6 +37,7 @@ class ForegroundVodrPlayerController @Inject constructor(
             current.copy(
                 queue = queue,
                 activeDocument = activeDocument ?: current.activeDocument,
+                runtimeMetadata = runtimeMetadata ?: current.runtimeMetadata,
                 currentChapterIndex = clampedIndex,
                 resumePositionMs = resumePositionMs.coerceAtLeast(0L),
                 currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->

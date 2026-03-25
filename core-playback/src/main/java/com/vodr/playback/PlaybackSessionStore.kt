@@ -9,6 +9,7 @@ import javax.inject.Singleton
 internal data class PlaybackSessionSnapshot(
     val queue: List<PlaybackChapter>,
     val activeDocument: PlaybackDocument?,
+    val runtimeMetadata: PlaybackRuntimeMetadata?,
     val currentChapterIndex: Int,
     val resumePositionMs: Long,
     val playbackSpeed: Float,
@@ -26,6 +27,18 @@ internal object PlaybackSessionCodec {
                 append(escape(document.sourceUri))
                 append('\t')
                 append(escape(document.mimeType))
+                appendLine()
+            }
+            snapshot.runtimeMetadata?.let { metadata ->
+                append("RUNTIME")
+                append('\t')
+                append(escape(metadata.personalizationProviderLabel.orEmpty()))
+                append('\t')
+                append(escape(metadata.personalizationDetail.orEmpty()))
+                append('\t')
+                append(escape(metadata.transcriptionProviderLabel.orEmpty()))
+                append('\t')
+                append(escape(metadata.transcriptionDetail.orEmpty()))
                 appendLine()
             }
             append("STATE")
@@ -58,6 +71,7 @@ internal object PlaybackSessionCodec {
             return null
         }
         var activeDocument: PlaybackDocument? = null
+        var runtimeMetadata: PlaybackRuntimeMetadata? = null
         var currentChapterIndex = 0
         var resumePositionMs = 0L
         var playbackSpeed = PlaybackState.DEFAULT_PLAYBACK_SPEED
@@ -84,6 +98,23 @@ internal object PlaybackSessionCodec {
                         ?: PlaybackState.DEFAULT_PLAYBACK_SPEED
                 }
 
+                "RUNTIME" -> {
+                    runtimeMetadata = PlaybackRuntimeMetadata(
+                        personalizationProviderLabel = tokens.getOrNull(1)
+                            ?.let(::unescape)
+                            .orNullIfBlank(),
+                        personalizationDetail = tokens.getOrNull(2)
+                            ?.let(::unescape)
+                            .orNullIfBlank(),
+                        transcriptionProviderLabel = tokens.getOrNull(3)
+                            ?.let(::unescape)
+                            .orNullIfBlank(),
+                        transcriptionDetail = tokens.getOrNull(4)
+                            ?.let(::unescape)
+                            .orNullIfBlank(),
+                    )
+                }
+
                 "CHAPTER" -> {
                     if (tokens.size >= 4) {
                         queue += PlaybackChapter(
@@ -103,6 +134,7 @@ internal object PlaybackSessionCodec {
         return PlaybackSessionSnapshot(
             queue = queue,
             activeDocument = activeDocument,
+            runtimeMetadata = runtimeMetadata,
             currentChapterIndex = currentChapterIndex.coerceIn(0, queue.lastIndex),
             resumePositionMs = resumePositionMs.coerceAtLeast(0L),
             playbackSpeed = playbackSpeed,
@@ -214,6 +246,7 @@ internal fun PlaybackState.toPlaybackSessionSnapshot(): PlaybackSessionSnapshot?
     return PlaybackSessionSnapshot(
         queue = queue,
         activeDocument = activeDocument,
+        runtimeMetadata = runtimeMetadata,
         currentChapterIndex = currentChapterIndex,
         resumePositionMs = resumePositionMs,
         playbackSpeed = playbackSpeed,
@@ -226,6 +259,7 @@ internal fun PlaybackSessionSnapshot.toPlaybackState(): PlaybackState {
     return PlaybackState(
         queue = queue,
         activeDocument = activeDocument,
+        runtimeMetadata = runtimeMetadata,
         currentChapterIndex = clampedIndex,
         resumePositionMs = resumePositionMs.coerceAtLeast(0L),
         currentChapterDurationMs = queue.getOrNull(clampedIndex)?.let { chapter ->
@@ -239,4 +273,8 @@ internal fun PlaybackSessionSnapshot.toPlaybackState(): PlaybackState {
         isVoiceReady = false,
         errorMessage = null,
     )
+}
+
+private fun String?.orNullIfBlank(): String? {
+    return this?.takeIf { it.isNotBlank() }
 }

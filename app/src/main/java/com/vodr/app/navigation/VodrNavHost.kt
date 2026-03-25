@@ -54,6 +54,7 @@ import com.vodr.library.settings.SettingsUiState
 import com.vodr.library.settings.SettingsViewModel
 import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackDocument
+import com.vodr.playback.PlaybackRuntimeMetadata
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.player.ui.PlayerScreen
@@ -114,6 +115,7 @@ fun VodrNavHost(
             playerViewModel.updateQueue(
                 queue = generationState.queue,
                 activeDocument = generationState.activeDocument?.toPlaybackDocument(),
+                runtimeMetadata = generationState.runtimeSummary?.toPlaybackRuntimeMetadata(),
             )
         }
     }
@@ -181,15 +183,6 @@ fun VodrNavHost(
             composable(VodrRoute.Player.route) {
                 PlayerScreen(
                     queue = generationState.queue,
-                    documentTitle = playerState.activeDocument?.title,
-                    documentSourceUri = playerState.activeDocument?.sourceUri,
-                    documentMimeType = playerState.activeDocument?.mimeType,
-                    personalizationProviderLabel = generationState.runtimeSummary
-                        ?.personalizationProvider
-                        ?.toDisplayName(),
-                    transcriptionProviderLabel = generationState.runtimeSummary
-                        ?.transcriptionProvider
-                        ?.toDisplayName(),
                     viewModel = playerViewModel,
                 )
             }
@@ -238,6 +231,15 @@ private fun com.vodr.generate.GeneratedDocumentSummary.toPlaybackDocument(): Pla
         title = displayName,
         sourceUri = sourceUri,
         mimeType = mimeType,
+    )
+}
+
+private fun com.vodr.generate.GenerationRuntimeSummary.toPlaybackRuntimeMetadata(): PlaybackRuntimeMetadata {
+    return PlaybackRuntimeMetadata(
+        personalizationProviderLabel = personalizationProvider.toDisplayName(),
+        personalizationDetail = personalizationDetail,
+        transcriptionProviderLabel = transcriptionProvider.toDisplayName(),
+        transcriptionDetail = transcriptionDetail,
     )
 }
 

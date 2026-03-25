@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackChapter
+import com.vodr.playback.PlaybackRuntimeMetadata
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -63,11 +64,6 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 fun PlayerScreen(
     queue: List<PlaybackChapter> = emptyList(),
-    documentTitle: String? = null,
-    documentSourceUri: String? = null,
-    documentMimeType: String? = null,
-    personalizationProviderLabel: String? = null,
-    transcriptionProviderLabel: String? = null,
     viewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
 ) {
@@ -130,9 +126,9 @@ fun PlayerScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 PlayerHeroCard(
-                    documentTitle = documentTitle,
-                    documentSourceUri = documentSourceUri,
-                    documentMimeType = documentMimeType,
+                    documentTitle = state.activeDocument?.title,
+                    documentSourceUri = state.activeDocument?.sourceUri,
+                    documentMimeType = state.activeDocument?.mimeType,
                     chapterTitle = currentChapter?.title ?: "No generated chapter yet.",
                     chapterIndex = state.currentChapterIndex + 1,
                     chapterCount = state.queue.size.coerceAtLeast(1),
@@ -141,8 +137,7 @@ fun PlayerScreen(
                     listeningLabel = "${formatPlaybackTime(displayedPositionMs)} / ${formatPlaybackTime(currentChapterDurationMs)}",
                     isVoiceReady = state.isVoiceReady,
                     playbackStatusLabel = state.playbackStatus.toReadableLabel(),
-                    personalizationProviderLabel = personalizationProviderLabel,
-                    transcriptionProviderLabel = transcriptionProviderLabel,
+                    runtimeMetadata = state.runtimeMetadata,
                 )
                 Card(
                     colors = CardDefaults.cardColors(
@@ -381,8 +376,7 @@ private fun PlayerHeroCard(
     listeningLabel: String,
     isVoiceReady: Boolean,
     playbackStatusLabel: String,
-    personalizationProviderLabel: String?,
-    transcriptionProviderLabel: String?,
+    runtimeMetadata: PlaybackRuntimeMetadata?,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -472,20 +466,36 @@ private fun PlayerHeroCard(
                     label = { Text(text = playbackStatusLabel) },
                 )
             }
-            if (personalizationProviderLabel != null || transcriptionProviderLabel != null) {
+            if (runtimeMetadata?.personalizationProviderLabel != null ||
+                runtimeMetadata?.transcriptionProviderLabel != null
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    personalizationProviderLabel?.let { label ->
+                    runtimeMetadata.personalizationProviderLabel?.let { label ->
                         AssistChip(
                             onClick = {},
                             label = { Text(text = "AI: $label") },
                         )
                     }
-                    transcriptionProviderLabel?.let { label ->
+                    runtimeMetadata.transcriptionProviderLabel?.let { label ->
                         AssistChip(
                             onClick = {},
                             label = { Text(text = "Transcript: $label") },
                         )
                     }
+                }
+                runtimeMetadata.personalizationDetail?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                runtimeMetadata.transcriptionDetail?.let { detail ->
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

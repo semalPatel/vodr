@@ -2,6 +2,7 @@ package com.vodr.player
 
 import com.vodr.playback.PlaybackChapter
 import com.vodr.playback.PlaybackDocument
+import com.vodr.playback.PlaybackRuntimeMetadata
 import com.vodr.playback.PlaybackState
 import com.vodr.playback.PlaybackStatus
 import com.vodr.playback.VodrPlayerController
@@ -162,12 +163,14 @@ class PlayerViewModelTest {
         override fun updateQueue(
             queue: List<PlaybackChapter>,
             activeDocument: PlaybackDocument?,
+            runtimeMetadata: PlaybackRuntimeMetadata?,
             currentChapterIndex: Int,
             resumePositionMs: Long,
         ) {
             mutableState.value = mutableState.value.copy(
                 queue = queue,
                 activeDocument = activeDocument,
+                runtimeMetadata = runtimeMetadata,
                 currentChapterIndex = if (queue.isEmpty()) {
                     0
                 } else {

@@ -26,6 +26,12 @@ class PlaybackSessionCodecTest {
                 sourceUri = "content://books/demo",
                 mimeType = "application/epub+zip",
             ),
+            runtimeMetadata = PlaybackRuntimeMetadata(
+                personalizationProviderLabel = "Device AI",
+                personalizationDetail = "Using on-device model",
+                transcriptionProviderLabel = "Offline Heuristic",
+                transcriptionDetail = "Offline-only fallback active",
+            ),
             currentChapterIndex = 1,
             resumePositionMs = 42_000L,
             playbackSpeed = 1.25f,
