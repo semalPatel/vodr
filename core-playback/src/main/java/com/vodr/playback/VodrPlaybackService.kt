@@ -236,13 +236,24 @@ class VodrPlaybackService : MediaSessionService() {
 
     private fun initializeTextToSpeech() {
         textToSpeech = TextToSpeech(applicationContext) { status ->
-            isVoiceReady = status == TextToSpeech.SUCCESS
-            if (isVoiceReady) {
-                textToSpeech?.language = Locale.getDefault()
+            val selectedLocale = if (status == TextToSpeech.SUCCESS) {
+                selectFirstSupportedTtsLocale(defaultLocale = Locale.getDefault()) { locale ->
+                    textToSpeech?.setLanguage(locale) ?: TextToSpeech.ERROR
+                }
+            } else {
+                null
             }
+            isVoiceReady = selectedLocale != null
             syncControllerState(
-                errorMessage = if (isVoiceReady) null else "Text-to-speech engine unavailable.",
+                errorMessage = when {
+                    status != TextToSpeech.SUCCESS -> "Text-to-speech engine unavailable."
+                    selectedLocale == null -> "No supported text-to-speech voice is installed on this device."
+                    else -> null
+                },
             )
+            if (isVoiceReady && player.isPlaying) {
+                syncTtsWithPlayer(force = true)
+            }
         }.apply {
             setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
@@ -429,4 +440,26 @@ class VodrPlaybackService : MediaSessionService() {
         private const val RESTART_THRESHOLD_MS: Long = 2_000L
         private const val REQUEST_CONTENT_INTENT: Int = 1
     }
+}
+
+internal fun selectFirstSupportedTtsLocale(
+    defaultLocale: Locale,
+    languageAvailability: (Locale) -> Int,
+): Locale? {
+    return preferredTtsLocales(defaultLocale).firstOrNull { locale ->
+        languageAvailability(locale).isSupportedTtsLanguageResult()
+    }
+}
+
+private fun preferredTtsLocales(defaultLocale: Locale): List<Locale> {
+    return buildList {
+        add(defaultLocale)
+        if (defaultLocale != Locale.US) {
+            add(Locale.US)
+        }
+    }
+}
+
+internal fun Int.isSupportedTtsLanguageResult(): Boolean {
+    return this >= TextToSpeech.LANG_AVAILABLE
 }
