@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,9 +30,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,14 +55,17 @@ import com.vodr.ui.VodrArtworkListRow
 import com.vodr.ui.VodrChoiceChip
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.VodrMessageText
+import com.vodr.ui.VodrMessageTone
 import com.vodr.ui.VodrInlineAction
+import com.vodr.ui.VodrScreenColumn
+import com.vodr.ui.VodrScreenScaffold
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrMotionSpecs
 import com.vodr.ui.theme.VodrSurfaceStyles
 import com.vodr.ui.theme.VodrUiTheme
 import com.vodr.ui.theme.vodrAnimateContentSize
 import com.vodr.ui.VodrMetaChip
-import com.vodr.ui.VodrScreenTopBar
 import com.vodr.ui.VodrSectionHeader
 
 @Composable
@@ -117,210 +117,203 @@ fun PlayerScreen(
     var isChapterMenuExpanded by remember { mutableStateOf(false) }
     val currentSessionId = state.sessionHistory.firstOrNull()?.sessionId
 
-    Scaffold(
+    VodrScreenScaffold(
+        title = "Player",
         modifier = modifier,
-        topBar = {
-            VodrScreenTopBar(title = "Player")
-        },
     ) { contentPadding ->
-        Surface(modifier = Modifier.padding(contentPadding)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                PlayerHeroCard(
-                    documentTitle = state.activeDocument?.title,
-                    documentSourceUri = state.activeDocument?.sourceUri,
-                    documentMimeType = state.activeDocument?.mimeType,
-                    chapterTitle = currentChapter?.title ?: "No generated chapter yet.",
-                    chapterIndex = state.currentChapterIndex + 1,
-                    chapterCount = state.queue.size.coerceAtLeast(1),
-                    chapterProgress = animatedChapterProgress,
-                    listeningProgress = animatedListeningProgress,
-                    listeningLabel = "${formatPlaybackTime(displayedPositionMs)} / ${formatPlaybackTime(currentChapterDurationMs)}",
-                    isVoiceReady = state.isVoiceReady,
-                    playbackStatusLabel = state.playbackStatus.toReadableLabel(),
-                    runtimeMetadata = state.runtimeMetadata,
+        VodrScreenColumn(
+            contentPadding = contentPadding,
+            fillMaxSize = true,
+        ) {
+            PlayerHeroCard(
+                documentTitle = state.activeDocument?.title,
+                documentSourceUri = state.activeDocument?.sourceUri,
+                documentMimeType = state.activeDocument?.mimeType,
+                chapterTitle = currentChapter?.title ?: "No generated chapter yet.",
+                chapterIndex = state.currentChapterIndex + 1,
+                chapterCount = state.queue.size.coerceAtLeast(1),
+                chapterProgress = animatedChapterProgress,
+                listeningProgress = animatedListeningProgress,
+                listeningLabel = "${formatPlaybackTime(displayedPositionMs)} / ${formatPlaybackTime(currentChapterDurationMs)}",
+                isVoiceReady = state.isVoiceReady,
+                playbackStatusLabel = state.playbackStatus.toReadableLabel(),
+                runtimeMetadata = state.runtimeMetadata,
+            )
+            if (state.sessionHistory.isNotEmpty()) {
+                ListeningSessionsCard(
+                    sessions = state.sessionHistory,
+                    currentSessionId = currentSessionId,
+                    onRestoreSession = viewModel::restoreSession,
+                    onRemoveSession = viewModel::removeSession,
+                    onSetFavorite = viewModel::setSessionFavorite,
                 )
-                if (state.sessionHistory.isNotEmpty()) {
-                    ListeningSessionsCard(
-                        sessions = state.sessionHistory,
-                        currentSessionId = currentSessionId,
-                        onRestoreSession = viewModel::restoreSession,
-                        onRemoveSession = viewModel::removeSession,
-                        onSetFavorite = viewModel::setSessionFavorite,
-                    )
-                }
-                Card(
-                    colors = VodrSurfaceStyles.subtleCardColors(),
+            }
+            Card(
+                colors = VodrSurfaceStyles.subtleCardColors(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .vodrAnimateContentSize()
+                        .padding(spacing.md + spacing.xxs),
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .vodrAnimateContentSize()
-                            .padding(spacing.md + spacing.xxs),
-                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                    VodrSectionHeader(
+                        title = "Playback position",
+                    )
+                    Slider(
+                        value = displayedPositionMs.toFloat(),
+                        onValueChange = { value ->
+                            isScrubbing = true
+                            scrubPositionMs = value
+                        },
+                        onValueChangeFinished = {
+                            viewModel.updateResumePosition(scrubPositionMs.toLong())
+                            isScrubbing = false
+                        },
+                        valueRange = 0f..currentChapterDurationMs.toFloat(),
+                        enabled = currentChapter != null && currentChapterDurationMs > 0L,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
+                        Text(
+                            text = formatPlaybackTime(displayedPositionMs),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = formatPlaybackTime(currentChapterDurationMs),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (state.queue.isNotEmpty()) {
                         VodrSectionHeader(
-                            title = "Playback position",
+                            title = "Book timeline",
                         )
-                        Slider(
-                            value = displayedPositionMs.toFloat(),
-                            onValueChange = { value ->
-                                isScrubbing = true
-                                scrubPositionMs = value
-                            },
-                            onValueChangeFinished = {
-                                viewModel.updateResumePosition(scrubPositionMs.toLong())
-                                isScrubbing = false
-                            },
-                            valueRange = 0f..currentChapterDurationMs.toFloat(),
-                            enabled = currentChapter != null && currentChapterDurationMs > 0L,
+                        ChapterTimelineMarkers(
+                            queue = state.queue,
+                            currentChapterIndex = state.currentChapterIndex,
+                            onSelectChapter = viewModel::selectChapter,
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                    }
+                }
+            }
+            VodrCrossfade(
+                targetState = currentChapter,
+                label = "player-chapter-preview",
+            ) { chapter ->
+                chapter?.let {
+                    Card(
+                        colors = VodrSurfaceStyles.subtleCardColors(),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .vodrAnimateContentSize()
+                                .padding(spacing.md + spacing.xxs),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
-                            Text(
-                                text = formatPlaybackTime(displayedPositionMs),
-                                style = MaterialTheme.typography.bodyMedium,
+                            VodrSectionHeader(
+                                title = "Chapter preview",
                             )
                             Text(
-                                text = formatPlaybackTime(currentChapterDurationMs),
+                                text = it.text.take(260),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (state.queue.isNotEmpty()) {
-                            VodrSectionHeader(
-                                title = "Book timeline",
-                            )
-                            ChapterTimelineMarkers(
-                                queue = state.queue,
-                                currentChapterIndex = state.currentChapterIndex,
-                                onSelectChapter = viewModel::selectChapter,
+                                maxLines = 6,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
-                VodrCrossfade(
-                    targetState = currentChapter,
-                    label = "player-chapter-preview",
-                ) { chapter ->
-                    chapter?.let {
-                        Card(
-                            colors = VodrSurfaceStyles.subtleCardColors(),
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .vodrAnimateContentSize()
-                                    .padding(spacing.md + spacing.xxs),
-                                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                            ) {
-                                VodrSectionHeader(
-                                    title = "Chapter preview",
-                                )
-                                Text(
-                                    text = it.text.take(260),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 6,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                PlaybackActionButton(
+                    icon = Icons.Rounded.SkipPrevious,
+                    label = "Prev",
+                    contentDescription = "Go to previous chapter",
+                    onClick = viewModel::goToPreviousChapter,
+                    enabled = currentChapter != null,
+                )
+                PlaybackActionButton(
+                    icon = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    label = if (isPlaying) "Pause" else "Play",
+                    contentDescription = if (isPlaying) {
+                        "Pause narration"
+                    } else {
+                        "Start narration"
+                    },
+                    onClick = viewModel::togglePlayback,
+                    enabled = currentChapter != null && state.isVoiceReady,
+                )
+                PlaybackActionButton(
+                    icon = Icons.Rounded.SkipNext,
+                    label = "Next",
+                    contentDescription = "Go to next chapter",
+                    onClick = viewModel::goToNextChapter,
+                    enabled = currentChapter != null,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                PlaybackActionButton(
+                    icon = Icons.Rounded.FastRewind,
+                    label = "-15s",
+                    contentDescription = "Seek backward 15 seconds",
+                    onClick = viewModel::seekBackward,
+                    enabled = currentChapter != null,
+                )
+                PlaybackActionButton(
+                    icon = Icons.AutoMirrored.Rounded.MenuBook,
+                    label = "Chapters",
+                    contentDescription = "Open chapter picker",
+                    onClick = { isChapterMenuExpanded = true },
+                    enabled = currentChapter != null,
+                )
+                DropdownMenu(
+                    expanded = isChapterMenuExpanded,
+                    onDismissRequest = { isChapterMenuExpanded = false },
+                ) {
+                    state.queue.forEachIndexed { index, chapter ->
+                        DropdownMenuItem(
+                            text = { Text(text = chapter.title) },
+                            onClick = {
+                                isChapterMenuExpanded = false
+                                viewModel.selectChapter(index)
+                            },
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    PlaybackActionButton(
-                        icon = Icons.Rounded.SkipPrevious,
-                        label = "Prev",
-                        contentDescription = "Go to previous chapter",
-                        onClick = viewModel::goToPreviousChapter,
-                        enabled = currentChapter != null,
-                    )
-                    PlaybackActionButton(
-                        icon = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        label = if (isPlaying) "Pause" else "Play",
-                        contentDescription = if (isPlaying) {
-                            "Pause narration"
-                        } else {
-                            "Start narration"
-                        },
-                        onClick = viewModel::togglePlayback,
-                        enabled = currentChapter != null && state.isVoiceReady,
-                    )
-                    PlaybackActionButton(
-                        icon = Icons.Rounded.SkipNext,
-                        label = "Next",
-                        contentDescription = "Go to next chapter",
-                        onClick = viewModel::goToNextChapter,
-                        enabled = currentChapter != null,
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    PlaybackActionButton(
-                        icon = Icons.Rounded.FastRewind,
-                        label = "-15s",
-                        contentDescription = "Seek backward 15 seconds",
-                        onClick = viewModel::seekBackward,
-                        enabled = currentChapter != null,
-                    )
-                    PlaybackActionButton(
-                        icon = Icons.AutoMirrored.Rounded.MenuBook,
-                        label = "Chapters",
-                        contentDescription = "Open chapter picker",
-                        onClick = { isChapterMenuExpanded = true },
-                        enabled = currentChapter != null,
-                    )
-                    DropdownMenu(
-                        expanded = isChapterMenuExpanded,
-                        onDismissRequest = { isChapterMenuExpanded = false },
-                    ) {
-                        state.queue.forEachIndexed { index, chapter ->
-                            DropdownMenuItem(
-                                text = { Text(text = chapter.title) },
-                                onClick = {
-                                    isChapterMenuExpanded = false
-                                    viewModel.selectChapter(index)
-                                },
-                            )
-                        }
-                    }
-                    PlaybackActionButton(
-                        icon = Icons.Rounded.FastForward,
-                        label = "+15s",
-                        contentDescription = "Seek forward 15 seconds",
-                        onClick = viewModel::seekForward,
-                        enabled = currentChapter != null,
-                    )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    VodrSectionHeader(
-                        title = "Playback speed",
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
-                            VodrChoiceChip(
-                                label = "${speed}x",
-                                selected = state.playbackSpeed == speed,
-                                onClick = {
-                                    viewModel.updatePlaybackSpeed(speed)
-                                },
-                            )
-                        }
+                PlaybackActionButton(
+                    icon = Icons.Rounded.FastForward,
+                    label = "+15s",
+                    contentDescription = "Seek forward 15 seconds",
+                    onClick = viewModel::seekForward,
+                    enabled = currentChapter != null,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                VodrSectionHeader(
+                    title = "Playback speed",
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
+                        VodrChoiceChip(
+                            label = "${speed}x",
+                            selected = state.playbackSpeed == speed,
+                            onClick = {
+                                viewModel.updatePlaybackSpeed(speed)
+                            },
+                        )
                     }
                 }
-                state.errorMessage?.let { errorMessage ->
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
+            }
+            state.errorMessage?.let { errorMessage ->
+                VodrMessageText(
+                    text = errorMessage,
+                    tone = VodrMessageTone.ERROR,
+                )
             }
         }
     }

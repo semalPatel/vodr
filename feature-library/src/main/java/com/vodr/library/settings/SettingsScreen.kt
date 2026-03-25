@@ -2,18 +2,15 @@ package com.vodr.library.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.ai.PersonalizationProviderType
 import com.vodr.ui.VodrRadioOptionRow
-import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrScreenColumn
+import com.vodr.ui.VodrScreenScaffold
 import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.VodrSliderSetting
 import com.vodr.ui.VodrTextSettingField
@@ -29,77 +26,68 @@ fun SettingsScreen(
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val spacing = VodrUiTheme.spacing
 
-    Scaffold(
+    VodrScreenScaffold(
+        title = "Settings",
         modifier = modifier,
-        topBar = {
-            VodrScreenTopBar(title = "Settings")
-        },
     ) { contentPadding ->
-        Surface(modifier = Modifier.padding(contentPadding)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                VodrSectionHeader(
-                    title = "Voice",
-                )
-                VodrTextSettingField(
-                    label = "Voice",
-                    value = state.voice,
-                    onValueChange = viewModel::updateVoice,
-                )
-                VodrSliderSetting(
-                    title = "Speech rate: ${"%.2f".format(state.speechRate)}",
-                    value = state.speechRate,
-                    onValueChange = viewModel::updateSpeechRate,
-                    valueRange = 0.5f..2.0f,
-                )
-                VodrSectionHeader(
-                    title = "Style",
-                )
-                VodrTextSettingField(
-                    label = "Style",
-                    value = state.style,
-                    onValueChange = viewModel::updateStyle,
-                )
-                VodrSectionHeader(
-                    title = "Personalization Provider",
-                    subtitle = "Auto prefers device AI first, then your configured local model, then offline fallback.",
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    PersonalizationProviderType.entries.forEach { providerType ->
-                        VodrRadioOptionRow(
-                            label = providerType.toReadableLabel(),
-                            selected = state.personalizationProviderType == providerType,
-                            onClick = {
-                                viewModel.updatePersonalizationProviderType(providerType)
-                            },
-                        )
-                    }
+        VodrScreenColumn(contentPadding = contentPadding) {
+            VodrSectionHeader(
+                title = "Voice",
+            )
+            VodrTextSettingField(
+                label = "Voice",
+                value = state.voice,
+                onValueChange = viewModel::updateVoice,
+            )
+            VodrSliderSetting(
+                title = "Speech rate: ${"%.2f".format(state.speechRate)}",
+                value = state.speechRate,
+                onValueChange = viewModel::updateSpeechRate,
+                valueRange = 0.5f..2.0f,
+            )
+            VodrSectionHeader(
+                title = "Style",
+            )
+            VodrTextSettingField(
+                label = "Style",
+                value = state.style,
+                onValueChange = viewModel::updateStyle,
+            )
+            VodrSectionHeader(
+                title = "Personalization Provider",
+                subtitle = "Auto prefers device AI first, then your configured local model, then offline fallback.",
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                PersonalizationProviderType.entries.forEach { providerType ->
+                    VodrRadioOptionRow(
+                        label = providerType.toReadableLabel(),
+                        selected = state.personalizationProviderType == providerType,
+                        onClick = {
+                            viewModel.updatePersonalizationProviderType(providerType)
+                        },
+                    )
                 }
-                VodrToggleSettingRow(
-                    title = "Offline-only mode",
-                    checked = state.offlineOnly,
-                    onCheckedChange = viewModel::updateOfflineOnly,
-                )
-                VodrTextSettingField(
-                    label = "Local model path",
-                    value = state.customLocalModelPath,
-                    onValueChange = viewModel::updateCustomLocalModelPath,
-                )
-                VodrTextSettingField(
-                    label = "Model name",
-                    value = state.customModelName,
-                    onValueChange = viewModel::updateCustomModelName,
-                )
-                VodrTextSettingField(
-                    label = "Custom endpoint",
-                    value = state.customEndpoint,
-                    onValueChange = viewModel::updateCustomEndpoint,
-                )
             }
+            VodrToggleSettingRow(
+                title = "Offline-only mode",
+                checked = state.offlineOnly,
+                onCheckedChange = viewModel::updateOfflineOnly,
+            )
+            VodrTextSettingField(
+                label = "Local model path",
+                value = state.customLocalModelPath,
+                onValueChange = viewModel::updateCustomLocalModelPath,
+            )
+            VodrTextSettingField(
+                label = "Model name",
+                value = state.customModelName,
+                onValueChange = viewModel::updateCustomModelName,
+            )
+            VodrTextSettingField(
+                label = "Custom endpoint",
+                value = state.customEndpoint,
+                onValueChange = viewModel::updateCustomEndpoint,
+            )
         }
     }
 }

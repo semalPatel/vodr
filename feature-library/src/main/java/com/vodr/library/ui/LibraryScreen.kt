@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,8 +31,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,10 +51,14 @@ import com.vodr.library.LibraryViewModel
 import com.vodr.ui.VodrArtworkListRow
 import com.vodr.ui.VodrChoiceChip
 import com.vodr.ui.DocumentArtworkCover
+import com.vodr.ui.VodrEmptyStateCard
 import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.VodrMetaChip
 import com.vodr.ui.PlaybackActionButton
-import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrMessageText
+import com.vodr.ui.VodrMessageTone
+import com.vodr.ui.VodrScreenColumn
+import com.vodr.ui.VodrScreenScaffold
 import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.theme.VodrAnimatedVisibility
 import com.vodr.ui.theme.VodrCrossfade
@@ -191,18 +192,14 @@ fun LibraryScreen(
         }
     }
 
-    Scaffold(
+    VodrScreenScaffold(
+        title = "Library",
         modifier = modifier,
-        topBar = {
-            VodrScreenTopBar(
-                title = "Library",
-                actions = {
-                    VodrInlineAction(
-                        label = "Settings",
-                        onClick = onOpenSettings,
-                        icon = Icons.Rounded.Settings,
-                    )
-                },
+        actions = {
+            VodrInlineAction(
+                label = "Settings",
+                onClick = onOpenSettings,
+                icon = Icons.Rounded.Settings,
             )
         },
         floatingActionButton = {
@@ -220,82 +217,78 @@ fun LibraryScreen(
             )
         },
     ) { contentPadding ->
-        Surface(modifier = Modifier.padding(contentPadding)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
+        VodrScreenColumn(
+            contentPadding = contentPadding,
+            fillMaxSize = true,
+        ) {
+            LibraryHeroCard(
+                documentCount = state.documents.size,
+                isImporting = state.isImporting,
+                onOpenGenerate = onOpenGenerate,
+            )
+            if (continueListeningDocumentTitle != null &&
+                continueListeningDocumentSourceUri != null &&
+                continueListeningDocumentMimeType != null
             ) {
-                LibraryHeroCard(
-                    documentCount = state.documents.size,
-                    isImporting = state.isImporting,
-                    onOpenGenerate = onOpenGenerate,
+                ContinueListeningCard(
+                    documentTitle = continueListeningDocumentTitle,
+                    documentSourceUri = continueListeningDocumentSourceUri,
+                    documentMimeType = continueListeningDocumentMimeType,
+                    chapterTitle = continueListeningChapterTitle,
+                    progress = continueListeningProgress,
+                    status = continueListeningStatus ?: "Ready",
+                    isFavorite = continueListeningIsFavorite,
+                    onResumePlayback = onResumePlayback,
+                    onToggleFavorite = onToggleContinueFavorite,
                 )
-                if (continueListeningDocumentTitle != null &&
-                    continueListeningDocumentSourceUri != null &&
-                    continueListeningDocumentMimeType != null
-                ) {
-                    ContinueListeningCard(
-                        documentTitle = continueListeningDocumentTitle,
-                        documentSourceUri = continueListeningDocumentSourceUri,
-                        documentMimeType = continueListeningDocumentMimeType,
-                        chapterTitle = continueListeningChapterTitle,
-                        progress = continueListeningProgress,
-                        status = continueListeningStatus ?: "Ready",
-                        isFavorite = continueListeningIsFavorite,
-                        onResumePlayback = onResumePlayback,
-                        onToggleFavorite = onToggleContinueFavorite,
-                    )
-                }
-                if (favoriteSessions.isNotEmpty()) {
-                    FavoriteSessionsSection(
-                        sessions = favoriteSessions,
-                        onOpenSession = onOpenRecentSession,
-                        onRemoveSession = onRemoveRecentSession,
-                        onToggleFavorite = onToggleRecentSessionFavorite,
-                    )
-                }
-                if (recentNonFavoriteSessions.isNotEmpty()) {
-                    RecentSessionsSection(
-                        sessions = recentNonFavoriteSessions,
-                        onOpenSession = onOpenRecentSession,
-                        onRemoveSession = onRemoveRecentSession,
-                        onToggleFavorite = onToggleRecentSessionFavorite,
-                    )
-                }
-                VodrSectionHeader(
-                    title = "Recently opened books",
+            }
+            if (favoriteSessions.isNotEmpty()) {
+                FavoriteSessionsSection(
+                    sessions = favoriteSessions,
+                    onOpenSession = onOpenRecentSession,
+                    onRemoveSession = onRemoveRecentSession,
+                    onToggleFavorite = onToggleRecentSessionFavorite,
                 )
-                if (state.errorMessage != null) {
-                    Text(
-                        text = state.errorMessage,
-                        color = MaterialTheme.colorScheme.error,
+            }
+            if (recentNonFavoriteSessions.isNotEmpty()) {
+                RecentSessionsSection(
+                    sessions = recentNonFavoriteSessions,
+                    onOpenSession = onOpenRecentSession,
+                    onRemoveSession = onRemoveRecentSession,
+                    onToggleFavorite = onToggleRecentSessionFavorite,
+                )
+            }
+            VodrSectionHeader(
+                title = "Recently opened books",
+            )
+            state.errorMessage?.let {
+                VodrMessageText(
+                    text = it,
+                    tone = VodrMessageTone.ERROR,
+                )
+            }
+            VodrCrossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
+                if (isEmpty) {
+                    EmptyLibraryCard(
+                        onAddBook = { showAddSheet = true },
                     )
-                }
-                VodrCrossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
-                    if (isEmpty) {
-                        EmptyLibraryCard(
-                            onAddBook = { showAddSheet = true },
-                        )
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(vertical = spacing.xs),
-                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                        ) {
-                            items(
-                                items = state.documents,
-                                key = { it.id },
-                            ) { document ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .vodrAnimateContentSize()
-                                        .clickable(onClick = onOpenGenerate),
-                                    colors = VodrSurfaceStyles.subtleCardColors(),
-                                ) {
-                                    LibraryDocumentCardContent(document = document)
-                                }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(vertical = spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        items(
+                            items = state.documents,
+                            key = { it.id },
+                        ) { document ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .vodrAnimateContentSize()
+                                    .clickable(onClick = onOpenGenerate),
+                                colors = VodrSurfaceStyles.subtleCardColors(),
+                            ) {
+                                LibraryDocumentCardContent(document = document)
                             }
                         }
                     }
@@ -594,31 +587,12 @@ private fun SessionShelfSection(
 private fun EmptyLibraryCard(
     onAddBook: () -> Unit,
 ) {
-    val spacing = VodrUiTheme.spacing
-    Card(
-        colors = VodrSurfaceStyles.subtleCardColors(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Text(
-                text = "No books yet",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = "Tap Add Book to import a PDF or EPUB, then generate a spoken chapter queue.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            VodrInlineAction(
-                label = "Import your first book",
-                onClick = onAddBook,
-            )
-        }
-    }
+    VodrEmptyStateCard(
+        title = "No books yet",
+        message = "Tap Add Book to import a PDF or EPUB, then generate a spoken chapter queue.",
+        actionLabel = "Import your first book",
+        onAction = onAddBook,
+    )
 }
 
 @Composable

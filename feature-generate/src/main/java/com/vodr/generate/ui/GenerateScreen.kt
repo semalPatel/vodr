@@ -11,8 +11,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,10 +26,14 @@ import com.vodr.generate.GenerationPhase
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
+import com.vodr.ui.VodrEmptyStateCard
 import com.vodr.ui.VodrMetaChip
-import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrMessageText
+import com.vodr.ui.VodrMessageTone
 import com.vodr.ui.VodrSegmentedSelector
 import com.vodr.ui.VodrSelectionButton
+import com.vodr.ui.VodrScreenColumn
+import com.vodr.ui.VodrScreenScaffold
 import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrMotionSpecs
@@ -64,60 +66,54 @@ fun GenerateScreen(
         }
     }
 
-    Scaffold(
+    VodrScreenScaffold(
+        title = "Generate",
         modifier = modifier,
-        topBar = {
-            VodrScreenTopBar(title = "Generate")
-        },
     ) { contentPadding ->
-        Surface(modifier = Modifier.padding(contentPadding)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
+        VodrScreenColumn(contentPadding = contentPadding) {
+            if (documents.isEmpty()) {
+                VodrEmptyStateCard(
+                    title = "No imported books yet",
+                    message = "Import a PDF or EPUB from Library before generating a listening session.",
+                )
+                return@VodrScreenColumn
+            }
+
+            Text(
+                text = "Turn any imported book into a focused listening session.",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            GenerationStatusCard(generationState = generationState)
+            VodrSectionHeader(
+                title = "Document",
+            )
+            documents.forEach { document ->
+                VodrSelectionButton(
+                    label = document.displayName,
+                    selected = selectedDocumentId == document.id,
+                    onClick = { selectedDocumentId = document.id },
+                )
+            }
+
+            VodrSectionHeader(
+                title = "Mode",
+            )
+            VodrSegmentedSelector(
+                options = GenerationMode.entries,
+                selectedOption = selectedMode,
+                onOptionSelected = { selectedMode = it },
+                optionLabel = { mode -> mode.name.replace('_', ' ') },
+            )
+
+            Button(
+                enabled = selectedDocumentId != null && !generationState.isGenerating,
+                modifier = Modifier.semantics { contentDescription = "Generate audio chapters and open player" },
+                onClick = {
+                    val documentId = selectedDocumentId ?: return@Button
+                    onGenerateRequested(documentId, selectedMode)
+                },
             ) {
-                if (documents.isEmpty()) {
-                    Text(text = "Import a PDF/EPUB in Library first.")
-                    return@Column
-                }
-
-                Text(
-                    text = "Turn any imported book into a focused listening session.",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                GenerationStatusCard(generationState = generationState)
-                VodrSectionHeader(
-                    title = "Document",
-                )
-                documents.forEach { document ->
-                    VodrSelectionButton(
-                        label = document.displayName,
-                        selected = selectedDocumentId == document.id,
-                        onClick = { selectedDocumentId = document.id },
-                    )
-                }
-
-                VodrSectionHeader(
-                    title = "Mode",
-                )
-                VodrSegmentedSelector(
-                    options = GenerationMode.entries,
-                    selectedOption = selectedMode,
-                    onOptionSelected = { selectedMode = it },
-                    optionLabel = { mode -> mode.name.replace('_', ' ') },
-                )
-
-                Button(
-                    enabled = selectedDocumentId != null && !generationState.isGenerating,
-                    modifier = Modifier.semantics { contentDescription = "Generate audio chapters and open player" },
-                    onClick = {
-                        val documentId = selectedDocumentId ?: return@Button
-                        onGenerateRequested(documentId, selectedMode)
-                    },
-                ) {
-                    Text(text = if (generationState.isGenerating) "Generating..." else "Generate and Open Player")
-                }
+                Text(text = if (generationState.isGenerating) "Generating..." else "Generate and Open Player")
             }
         }
     }
@@ -209,10 +205,9 @@ private fun GenerationStatusCard(
                 }
             }
             generationState.error?.let {
-                Text(
+                VodrMessageText(
                     text = it.toUserMessage(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    tone = VodrMessageTone.ERROR,
                 )
             }
         }
