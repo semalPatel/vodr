@@ -11,11 +11,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +30,8 @@ import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
 import com.vodr.ui.VodrMetaChip
 import com.vodr.ui.VodrScreenTopBar
+import com.vodr.ui.VodrSegmentedSelector
+import com.vodr.ui.VodrSelectionButton
 import com.vodr.ui.VodrSectionHeader
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrMotionSpecs
@@ -93,43 +91,22 @@ fun GenerateScreen(
                     title = "Document",
                 )
                 documents.forEach { document ->
-                    val isSelected = selectedDocumentId == document.id
-                    if (isSelected) {
-                        Button(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { selectedDocumentId = document.id },
-                        ) {
-                            Text(text = document.displayName)
-                        }
-                    } else {
-                        OutlinedButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { selectedDocumentId = document.id },
-                        ) {
-                            Text(text = document.displayName)
-                        }
-                    }
+                    VodrSelectionButton(
+                        label = document.displayName,
+                        selected = selectedDocumentId == document.id,
+                        onClick = { selectedDocumentId = document.id },
+                    )
                 }
 
                 VodrSectionHeader(
                     title = "Mode",
                 )
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    GenerationMode.entries.forEachIndexed { index, mode ->
-                        SegmentedButton(
-                            selected = selectedMode == mode,
-                            onClick = { selectedMode = mode },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = GenerationMode.entries.size,
-                            ),
-                        ) {
-                            Text(text = mode.name.replace('_', ' '))
-                        }
-                    }
-                }
+                VodrSegmentedSelector(
+                    options = GenerationMode.entries,
+                    selectedOption = selectedMode,
+                    onOptionSelected = { selectedMode = it },
+                    optionLabel = { mode -> mode.name.replace('_', ' ') },
+                )
 
                 Button(
                     enabled = selectedDocumentId != null && !generationState.isGenerating,

@@ -29,7 +29,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -52,6 +51,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vodr.library.ImportDocumentRequest
 import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
+import com.vodr.ui.VodrArtworkListRow
+import com.vodr.ui.VodrChoiceChip
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.VodrMetaChip
@@ -410,20 +411,12 @@ private fun ContinueListeningCard(
                         text = "Continue listening",
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    FilterChip(
+                    VodrChoiceChip(
+                        label = "Favorite",
                         selected = isFavorite,
                         onClick = onToggleFavorite,
-                        label = { Text(text = "Favorite") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = if (isFavorite) {
-                                    Icons.Rounded.Star
-                                } else {
-                                    Icons.Rounded.StarBorder
-                                },
-                                contentDescription = null,
-                            )
-                        },
+                        selectedIcon = Icons.Rounded.Star,
+                        unselectedIcon = Icons.Rounded.StarBorder,
                     )
                 }
                 Text(
@@ -530,43 +523,18 @@ private fun SessionShelfSection(
                         modifier = Modifier.padding(spacing.md),
                         verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            DocumentArtworkCover(
-                                title = session.documentTitle,
-                                sourceUri = session.documentSourceUri,
-                                mimeType = session.documentMimeType,
-                                modifier = Modifier.size(
-                                    width = sizes.sessionArtworkWidth,
-                                    height = sizes.sessionArtworkHeight,
-                                ),
-                            )
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(spacing.xxs),
-                            ) {
-                                Text(
-                                    text = session.documentTitle,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = session.chapterTitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = relativeImportedLabel(session.updatedAtEpochMs),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                        VodrArtworkListRow(
+                            title = session.documentTitle,
+                            sourceUri = session.documentSourceUri,
+                            mimeType = session.documentMimeType,
+                            subtitle = session.chapterTitle,
+                            supportingText = relativeImportedLabel(session.updatedAtEpochMs),
+                            artworkWidth = sizes.sessionArtworkWidth,
+                            artworkHeight = sizes.sessionArtworkHeight,
+                            titleTextStyle = MaterialTheme.typography.titleSmall,
+                            subtitleTextStyle = MaterialTheme.typography.bodySmall,
+                            supportingTextStyle = MaterialTheme.typography.bodySmall,
+                        )
                         androidx.compose.material3.LinearProgressIndicator(
                             progress = { session.progressFraction.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth(),
@@ -595,7 +563,8 @@ private fun SessionShelfSection(
                                 onClick = { onOpenSession(session.sessionId) },
                                 icon = Icons.Rounded.PlayArrow,
                             )
-                            FilterChip(
+                            VodrChoiceChip(
+                                label = "Favorite",
                                 selected = session.isFavorite,
                                 onClick = {
                                     onToggleFavorite(
@@ -603,17 +572,8 @@ private fun SessionShelfSection(
                                         !session.isFavorite,
                                     )
                                 },
-                                label = { Text(text = "Favorite") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = if (session.isFavorite) {
-                                            Icons.Rounded.Star
-                                        } else {
-                                            Icons.Rounded.StarBorder
-                                        },
-                                        contentDescription = null,
-                                    )
-                                },
+                                selectedIcon = Icons.Rounded.Star,
+                                unselectedIcon = Icons.Rounded.StarBorder,
                             )
                             onRemoveSession?.let { remove ->
                                 VodrInlineAction(
@@ -667,46 +627,28 @@ private fun LibraryDocumentCardContent(
 ) {
     val spacing = VodrUiTheme.spacing
     val sizes = VodrUiTheme.sizes
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .vodrAnimateContentSize()
             .padding(spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        DocumentArtworkCover(
+        VodrArtworkListRow(
             title = document.metadata.displayName,
             sourceUri = document.metadata.sourceUri,
             mimeType = document.metadata.mimeType,
-            modifier = Modifier.size(
-                width = sizes.documentArtworkWidth,
-                height = sizes.documentArtworkHeight,
-            ),
+            subtitle = buildDocumentSubtitle(document = document),
+            artworkWidth = sizes.documentArtworkWidth,
+            artworkHeight = sizes.documentArtworkHeight,
         )
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Text(
-                text = document.metadata.displayName,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            VodrMetaChip(
+                label = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
             )
-            Text(
-                text = buildDocumentSubtitle(document = document),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            VodrMetaChip(
+                label = relativeImportedLabel(document.metadata.importedAtEpochMs),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                VodrMetaChip(
-                    label = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
-                )
-                VodrMetaChip(
-                    label = relativeImportedLabel(document.metadata.importedAtEpochMs),
-                )
-            }
         }
     }
 }

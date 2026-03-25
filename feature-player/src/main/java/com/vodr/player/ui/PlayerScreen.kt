@@ -29,8 +29,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -56,6 +54,8 @@ import com.vodr.playback.PlaybackRuntimeMetadata
 import com.vodr.playback.PlaybackSessionSummary
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
+import com.vodr.ui.VodrArtworkListRow
+import com.vodr.ui.VodrChoiceChip
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
 import com.vodr.ui.VodrInlineAction
@@ -304,12 +304,12 @@ fun PlayerScreen(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                         listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
-                            FilterChip(
+                            VodrChoiceChip(
+                                label = "${speed}x",
                                 selected = state.playbackSpeed == speed,
                                 onClick = {
                                     viewModel.updatePlaybackSpeed(speed)
                                 },
-                                label = { Text(text = "${speed}x") },
                             )
                         }
                     }
@@ -372,45 +372,20 @@ private fun ListeningSessionsCard(
                             modifier = Modifier.padding(spacing.md),
                             verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                DocumentArtworkCover(
-                                    title = session.documentTitle,
-                                    sourceUri = session.documentSourceUri,
-                                    mimeType = session.documentMimeType,
-                                    modifier = Modifier.size(
-                                        width = sizes.playerSessionArtworkWidth,
-                                        height = sizes.playerSessionArtworkHeight,
-                                    ),
-                                )
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(spacing.xxs),
-                                ) {
-                                    Text(
-                                        text = session.documentTitle,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = session.chapterTitle,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = session.updatedAtEpochMs.toSessionUpdatedLabel(
-                                            isCurrent = isCurrent,
-                                        ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                            VodrArtworkListRow(
+                                title = session.documentTitle,
+                                sourceUri = session.documentSourceUri,
+                                mimeType = session.documentMimeType,
+                                subtitle = session.chapterTitle,
+                                supportingText = session.updatedAtEpochMs.toSessionUpdatedLabel(
+                                    isCurrent = isCurrent,
+                                ),
+                                artworkWidth = sizes.playerSessionArtworkWidth,
+                                artworkHeight = sizes.playerSessionArtworkHeight,
+                                titleTextStyle = MaterialTheme.typography.titleSmall,
+                                subtitleTextStyle = MaterialTheme.typography.bodySmall,
+                                supportingTextStyle = MaterialTheme.typography.bodySmall,
+                            )
                             LinearProgressIndicator(
                                 progress = { session.progressFraction.coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth(),
@@ -432,7 +407,8 @@ private fun ListeningSessionsCard(
                                         Icons.AutoMirrored.Rounded.MenuBook
                                     },
                                 )
-                                FilterChip(
+                                VodrChoiceChip(
+                                    label = "Favorite",
                                     selected = session.isFavorite,
                                     onClick = {
                                         onSetFavorite(
@@ -440,17 +416,8 @@ private fun ListeningSessionsCard(
                                             !session.isFavorite,
                                         )
                                     },
-                                    label = { Text(text = "Favorite") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = if (session.isFavorite) {
-                                                Icons.Rounded.Star
-                                            } else {
-                                                Icons.Rounded.StarBorder
-                                            },
-                                            contentDescription = null,
-                                        )
-                                    },
+                                    selectedIcon = Icons.Rounded.Star,
+                                    unselectedIcon = Icons.Rounded.StarBorder,
                                 )
                                 if (!isCurrent) {
                                     VodrInlineAction(
