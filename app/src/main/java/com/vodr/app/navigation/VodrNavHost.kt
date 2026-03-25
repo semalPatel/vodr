@@ -1,11 +1,8 @@
 package com.vodr.app.navigation
 
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,22 +11,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,14 +49,13 @@ import com.vodr.library.ui.LibraryScreen
 import com.vodr.library.settings.SettingsScreen
 import com.vodr.library.settings.SettingsUiState
 import com.vodr.library.settings.SettingsViewModel
-import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackDocument
 import com.vodr.playback.PlaybackRuntimeMetadata
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.player.ui.PlayerScreen
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.vodr.ui.CompactPlaybackIconButton
+import com.vodr.ui.DocumentArtworkCover
 
 sealed interface VodrRoute {
     val route: String
@@ -315,7 +310,7 @@ private fun MiniPlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (documentSourceUri != null && documentMimeType != null) {
-                    MiniPlayerArtwork(
+                    DocumentArtworkCover(
                         title = documentTitle,
                         sourceUri = documentSourceUri,
                         mimeType = documentMimeType,
@@ -355,77 +350,25 @@ private fun MiniPlayerBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onTogglePlayback) {
-                        Text(text = if (isPlaying) "Pause" else "Play")
-                    }
-                    TextButton(onClick = onSkipNext) {
-                        Text(text = "Next")
-                    }
+                    CompactPlaybackIconButton(
+                        icon = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) {
+                            "Pause playback"
+                        } else {
+                            "Resume playback"
+                        },
+                        onClick = onTogglePlayback,
+                    )
+                    CompactPlaybackIconButton(
+                        icon = Icons.Rounded.SkipNext,
+                        contentDescription = "Skip to next chapter",
+                        onClick = onSkipNext,
+                    )
                 }
             }
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun MiniPlayerArtwork(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-    modifier: Modifier = Modifier,
-) {
-    val bitmap by rememberDocumentArtworkBitmap(
-        title = title,
-        sourceUri = sourceUri,
-        mimeType = mimeType,
-    )
-    if (bitmap != null) {
-        Image(
-            bitmap = requireNotNull(bitmap).asImageBitmap(),
-            contentDescription = "$title cover art",
-            contentScale = ContentScale.Crop,
-            modifier = modifier
-                .clip(MaterialTheme.shapes.medium),
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = title.take(2).uppercase(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
-private fun rememberDocumentArtworkBitmap(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-): androidx.compose.runtime.State<Bitmap?> {
-    val context = LocalContext.current
-    return produceState<Bitmap?>(
-        initialValue = null,
-        key1 = title,
-        key2 = sourceUri,
-        key3 = mimeType,
-    ) {
-        value = withContext(Dispatchers.IO) {
-            DocumentArtworkLoader.load(
-                context = context,
-                sourceUri = sourceUri,
-                mimeType = mimeType,
-                title = title,
             )
         }
     }

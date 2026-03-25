@@ -1,15 +1,12 @@
 package com.vodr.library.ui
 
-import android.graphics.Bitmap
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +22,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -43,13 +48,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -60,9 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vodr.library.ImportDocumentRequest
 import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
-import com.vodr.parser.DocumentArtworkLoader
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.vodr.ui.DocumentArtworkCover
+import com.vodr.ui.PlaybackActionButton
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -196,6 +196,10 @@ fun LibraryScreen(
                 title = { Text(text = "Library") },
                 actions = {
                     TextButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = null,
+                        )
                         Text(text = "Settings")
                     }
                 }
@@ -205,7 +209,12 @@ fun LibraryScreen(
             ExtendedFloatingActionButton(
                 expanded = true,
                 onClick = { showAddSheet = true },
-                icon = { Text(text = "+") },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                    )
+                },
                 text = { Text(text = "Add Book") },
                 modifier = Modifier.semantics { contentDescription = "Add a new book" },
             )
@@ -386,7 +395,7 @@ private fun ContinueListeningCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            DocumentArtworkThumbnail(
+            DocumentArtworkCover(
                 title = documentTitle,
                 sourceUri = documentSourceUri,
                 mimeType = documentMimeType,
@@ -408,6 +417,16 @@ private fun ContinueListeningCard(
                         selected = isFavorite,
                         onClick = onToggleFavorite,
                         label = { Text(text = "Favorite") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = if (isFavorite) {
+                                    Icons.Rounded.Star
+                                } else {
+                                    Icons.Rounded.StarBorder
+                                },
+                                contentDescription = null,
+                            )
+                        },
                     )
                 }
                 Text(
@@ -434,9 +453,12 @@ private fun ContinueListeningCard(
                     progress = { progress.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                TextButton(onClick = onResumePlayback) {
-                    Text(text = "Open player")
-                }
+                PlaybackActionButton(
+                    icon = Icons.Rounded.PlayArrow,
+                    label = "Open player",
+                    contentDescription = "Open player for current session",
+                    onClick = onResumePlayback,
+                )
             }
         }
     }
@@ -527,7 +549,7 @@ private fun SessionShelfSection(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            DocumentArtworkThumbnail(
+                            DocumentArtworkCover(
                                 title = session.documentTitle,
                                 sourceUri = session.documentSourceUri,
                                 mimeType = session.documentMimeType,
@@ -566,6 +588,12 @@ private fun SessionShelfSection(
                                 AssistChip(
                                     onClick = {},
                                     label = { Text(text = "Favorite") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Star,
+                                            contentDescription = null,
+                                        )
+                                    },
                                 )
                             }
                             session.personalizationProviderLabel?.let { label ->
@@ -583,6 +611,10 @@ private fun SessionShelfSection(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = { onOpenSession(session.sessionId) }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PlayArrow,
+                                    contentDescription = null,
+                                )
                                 Text(text = "Open")
                             }
                             FilterChip(
@@ -594,9 +626,23 @@ private fun SessionShelfSection(
                                     )
                                 },
                                 label = { Text(text = "Favorite") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (session.isFavorite) {
+                                            Icons.Rounded.Star
+                                        } else {
+                                            Icons.Rounded.StarBorder
+                                        },
+                                        contentDescription = null,
+                                    )
+                                },
                             )
                             onRemoveSession?.let { remove ->
                                 TextButton(onClick = { remove(session.sessionId) }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        contentDescription = null,
+                                    )
                                     Text(text = "Remove")
                                 }
                             }
@@ -651,7 +697,7 @@ private fun LibraryDocumentCardContent(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        DocumentArtworkThumbnail(
+        DocumentArtworkCover(
             title = document.metadata.displayName,
             sourceUri = document.metadata.sourceUri,
             mimeType = document.metadata.mimeType,
@@ -688,65 +734,6 @@ private fun LibraryDocumentCardContent(
             }
         }
     }
-}
-
-@Composable
-private fun DocumentArtworkThumbnail(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-    modifier: Modifier = Modifier,
-) {
-    val bitmap by rememberDocumentArtworkBitmap(
-        title = title,
-        sourceUri = sourceUri,
-        mimeType = mimeType,
-    )
-    if (bitmap != null) {
-        Image(
-            bitmap = requireNotNull(bitmap).asImageBitmap(),
-            contentDescription = "$title cover art",
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(MaterialTheme.shapes.medium),
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = title.take(2).uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
-private fun rememberDocumentArtworkBitmap(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-) : androidx.compose.runtime.State<Bitmap?> {
-    val context = LocalContext.current
-    return produceState<Bitmap?>(
-        initialValue = null,
-        key1 = title,
-        key2 = sourceUri,
-        key3 = mimeType,
-    ) {
-    value = withContext(Dispatchers.IO) {
-        DocumentArtworkLoader.load(
-            context = context,
-            sourceUri = sourceUri,
-            mimeType = mimeType,
-            title = title,
-        )
-    }
-}
 }
 
 private fun buildDocumentSubtitle(document: ImportedDocument): String {

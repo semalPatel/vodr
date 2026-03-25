@@ -54,6 +54,7 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -64,9 +65,9 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(project(":core-ai"))
     implementation(project(":core-data"))
-    implementation(project(":core-parser"))
     implementation(project(":core-playback"))
     implementation(project(":core-segmentation"))
+    implementation(project(":core-ui"))
     implementation(project(":feature-generate"))
     implementation(project(":feature-library"))
     implementation(project(":feature-player"))

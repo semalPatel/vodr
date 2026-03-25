@@ -40,6 +40,7 @@ dependencies {
     implementation(composeBom)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
@@ -50,7 +51,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(project(":core-ai"))
     implementation(project(":core-data"))
-    implementation(project(":core-parser"))
+    implementation(project(":core-ui"))
 
     kapt(libs.hilt.android.compiler)
 

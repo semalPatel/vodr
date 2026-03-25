@@ -1,10 +1,8 @@
 package com.vodr.player.ui
 
-import android.graphics.Bitmap
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,14 +17,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -39,29 +48,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackChapter
 import com.vodr.playback.PlaybackRuntimeMetadata
 import com.vodr.playback.PlaybackSessionSummary
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.vodr.ui.DocumentArtworkCover
+import com.vodr.ui.PlaybackActionButton
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -234,45 +238,47 @@ fun PlayerScreen(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        enabled = currentChapter != null,
+                    PlaybackActionButton(
+                        icon = Icons.Rounded.SkipPrevious,
+                        label = "Prev",
+                        contentDescription = "Go to previous chapter",
                         onClick = viewModel::goToPreviousChapter,
-                    ) {
-                        Text(text = "Prev")
-                    }
-                    Button(
-                        enabled = currentChapter != null && state.isVoiceReady,
-                        modifier = Modifier.semantics {
-                            contentDescription = if (isPlaying) {
-                                "Pause narration"
-                            } else {
-                                "Start narration"
-                            }
+                        enabled = currentChapter != null,
+                    )
+                    PlaybackActionButton(
+                        icon = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        label = if (isPlaying) "Pause" else "Play",
+                        contentDescription = if (isPlaying) {
+                            "Pause narration"
+                        } else {
+                            "Start narration"
                         },
                         onClick = viewModel::togglePlayback,
-                    ) {
-                        Text(text = if (isPlaying) "Pause" else "Play")
-                    }
-                    Button(
-                        enabled = currentChapter != null,
+                        enabled = currentChapter != null && state.isVoiceReady,
+                    )
+                    PlaybackActionButton(
+                        icon = Icons.Rounded.SkipNext,
+                        label = "Next",
+                        contentDescription = "Go to next chapter",
                         onClick = viewModel::goToNextChapter,
-                    ) {
-                        Text(text = "Next")
-                    }
+                        enabled = currentChapter != null,
+                    )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        enabled = currentChapter != null,
+                    PlaybackActionButton(
+                        icon = Icons.Rounded.FastRewind,
+                        label = "-15s",
+                        contentDescription = "Seek backward 15 seconds",
                         onClick = viewModel::seekBackward,
-                    ) {
-                        Text(text = "-15s")
-                    }
-                    Button(
                         enabled = currentChapter != null,
+                    )
+                    PlaybackActionButton(
+                        icon = Icons.AutoMirrored.Rounded.MenuBook,
+                        label = "Chapters",
+                        contentDescription = "Open chapter picker",
                         onClick = { isChapterMenuExpanded = true },
-                    ) {
-                        Text(text = "Chapters")
-                    }
+                        enabled = currentChapter != null,
+                    )
                     DropdownMenu(
                         expanded = isChapterMenuExpanded,
                         onDismissRequest = { isChapterMenuExpanded = false },
@@ -287,12 +293,13 @@ fun PlayerScreen(
                             )
                         }
                     }
-                    Button(
-                        enabled = currentChapter != null,
+                    PlaybackActionButton(
+                        icon = Icons.Rounded.FastForward,
+                        label = "+15s",
+                        contentDescription = "Seek forward 15 seconds",
                         onClick = viewModel::seekForward,
-                    ) {
-                        Text(text = "+15s")
-                    }
+                        enabled = currentChapter != null,
+                    )
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -383,7 +390,7 @@ private fun ListeningSessionsCard(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                SessionArtworkThumbnail(
+                                DocumentArtworkCover(
                                     title = session.documentTitle,
                                     sourceUri = session.documentSourceUri,
                                     mimeType = session.documentMimeType,
@@ -424,12 +431,26 @@ private fun ListeningSessionsCard(
                                     AssistChip(
                                         onClick = {},
                                         label = { Text(text = "Favorite") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Star,
+                                                contentDescription = null,
+                                            )
+                                        },
                                     )
                                 }
                                 TextButton(
                                     onClick = { onRestoreSession(session.sessionId) },
                                     enabled = !isCurrent,
                                 ) {
+                                    Icon(
+                                        imageVector = if (isCurrent) {
+                                            Icons.Rounded.PlayArrow
+                                        } else {
+                                            Icons.AutoMirrored.Rounded.MenuBook
+                                        },
+                                        contentDescription = null,
+                                    )
                                     Text(text = if (isCurrent) "Current session" else "Switch")
                                 }
                                 FilterChip(
@@ -441,9 +462,23 @@ private fun ListeningSessionsCard(
                                         )
                                     },
                                     label = { Text(text = "Favorite") },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = if (session.isFavorite) {
+                                                Icons.Rounded.Star
+                                            } else {
+                                                Icons.Rounded.StarBorder
+                                            },
+                                            contentDescription = null,
+                                        )
+                                    },
                                 )
                                 if (!isCurrent) {
                                     TextButton(onClick = { onRemoveSession(session.sessionId) }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.DeleteOutline,
+                                            contentDescription = null,
+                                        )
                                         Text(text = "Remove")
                                     }
                                 }
@@ -503,41 +538,6 @@ private fun ChapterTimelineMarkers(
 }
 
 @Composable
-private fun SessionArtworkThumbnail(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-    modifier: Modifier = Modifier,
-) {
-    val bitmap by rememberDocumentArtworkBitmap(
-        title = title,
-        sourceUri = sourceUri,
-        mimeType = mimeType,
-    )
-    if (bitmap != null) {
-        Image(
-            bitmap = requireNotNull(bitmap).asImageBitmap(),
-            contentDescription = "$title cover art",
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(MaterialTheme.shapes.medium),
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = title.take(2).uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
 private fun PlayerHeroCard(
     documentTitle: String?,
     documentSourceUri: String?,
@@ -569,10 +569,12 @@ private fun PlayerHeroCard(
                 contentAlignment = Alignment.Center,
             ) {
                 if (documentTitle != null && documentSourceUri != null && documentMimeType != null) {
-                    PlayerArtwork(
+                    DocumentArtworkCover(
                         title = documentTitle,
                         sourceUri = documentSourceUri,
                         mimeType = documentMimeType,
+                        modifier = Modifier.size(width = 144.dp, height = 192.dp),
+                        shape = MaterialTheme.shapes.large,
                     )
                 } else {
                     Box(
@@ -672,67 +674,6 @@ private fun PlayerHeroCard(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PlayerArtwork(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-) {
-    val bitmap by rememberDocumentArtworkBitmap(
-        title = title,
-        sourceUri = sourceUri,
-        mimeType = mimeType,
-    )
-    if (bitmap != null) {
-        Image(
-            bitmap = requireNotNull(bitmap).asImageBitmap(),
-            contentDescription = "$title cover art",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(width = 144.dp, height = 192.dp)
-                .clip(MaterialTheme.shapes.large),
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .size(width = 144.dp, height = 192.dp)
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = title.take(2).uppercase(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
-private fun rememberDocumentArtworkBitmap(
-    title: String,
-    sourceUri: String,
-    mimeType: String,
-): androidx.compose.runtime.State<Bitmap?> {
-    val context = LocalContext.current
-    return produceState<Bitmap?>(
-        initialValue = null,
-        key1 = title,
-        key2 = sourceUri,
-        key3 = mimeType,
-    ) {
-        value = withContext(Dispatchers.IO) {
-            DocumentArtworkLoader.load(
-                context = context,
-                sourceUri = sourceUri,
-                mimeType = mimeType,
-                title = title,
-            )
         }
     }
 }

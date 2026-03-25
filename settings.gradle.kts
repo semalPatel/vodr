@@ -20,6 +20,7 @@ include(
     ":app",
     ":core-data",
     ":core-parser",
+    ":core-ui",
     ":core-segmentation",
     ":core-ai",
     ":core-tts",
