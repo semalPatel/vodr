@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -29,8 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import com.vodr.parser.DocumentArtworkLoader
+import com.vodr.ui.theme.VodrUiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -83,19 +82,21 @@ fun PlaybackActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val sizes = VodrUiTheme.sizes
+    val spacing = VodrUiTheme.spacing
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 48.dp),
+        modifier = modifier.defaultMinSize(minHeight = sizes.actionMinHeight),
         enabled = enabled,
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(sizes.actionIcon),
             )
             Text(
                 text = label,
@@ -113,6 +114,7 @@ fun CompactPlaybackIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val sizes = VodrUiTheme.sizes
     FilledIconButton(
         onClick = onClick,
         modifier = modifier,
@@ -121,6 +123,7 @@ fun CompactPlaybackIconButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
+            modifier = Modifier.size(sizes.compactActionIcon),
         )
     }
 }

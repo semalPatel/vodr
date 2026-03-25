@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,7 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.playback.PlaybackChapter
@@ -66,6 +63,8 @@ import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.theme.VodrSurfaceStyles
+import com.vodr.ui.theme.VodrUiTheme
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,6 +72,7 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
 ) {
+    val spacing = VodrUiTheme.spacing
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val currentChapter = state.currentChapter
     val chapterProgressTarget = if (state.queue.isEmpty()) {
@@ -123,8 +123,8 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 PlayerHeroCard(
                     documentTitle = state.activeDocument?.title,
@@ -150,16 +150,14 @@ fun PlayerScreen(
                     )
                 }
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                    ),
+                    colors = VodrSurfaceStyles.subtleCardColors(),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .animateContentSize()
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                            .padding(spacing.md + spacing.xxs),
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
                         Text(
                             text = "Playback position",
@@ -211,16 +209,14 @@ fun PlayerScreen(
                 ) { chapter ->
                     chapter?.let {
                         Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            ),
+                            colors = VodrSurfaceStyles.subtleCardColors(),
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .animateContentSize()
-                                    .padding(18.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    .padding(spacing.md + spacing.xxs),
+                                verticalArrangement = Arrangement.spacedBy(spacing.sm),
                             ) {
                                 Text(
                                     text = "Chapter preview",
@@ -237,7 +233,7 @@ fun PlayerScreen(
                         }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     PlaybackActionButton(
                         icon = Icons.Rounded.SkipPrevious,
                         label = "Prev",
@@ -264,7 +260,7 @@ fun PlayerScreen(
                         enabled = currentChapter != null,
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     PlaybackActionButton(
                         icon = Icons.Rounded.FastRewind,
                         label = "-15s",
@@ -301,12 +297,12 @@ fun PlayerScreen(
                         enabled = currentChapter != null,
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     Text(
                         text = "Playback speed",
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                         listOf(0.85f, 1.0f, 1.25f, 1.5f).forEach { speed ->
                             FilterChip(
                                 selected = state.playbackSpeed == speed,
@@ -338,22 +334,22 @@ private fun ListeningSessionsCard(
     onRemoveSession: (String) -> Unit,
     onSetFavorite: (String, Boolean) -> Unit,
 ) {
+    val spacing = VodrUiTheme.spacing
+    val sizes = VodrUiTheme.sizes
     val displayedSessions = sessions.sortedWith(
         compareByDescending<PlaybackSessionSummary> { it.sessionId == currentSessionId }
             .thenByDescending { it.isFavorite }
             .thenByDescending { it.updatedAtEpochMs },
     )
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        ),
+        colors = VodrSurfaceStyles.subtleCardColors(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(spacing.md + spacing.xxs),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Text(
                 text = "Listening sessions",
@@ -364,41 +360,39 @@ private fun ListeningSessionsCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 itemsIndexed(
                     items = displayedSessions,
                     key = { _, session -> session.sessionId },
                 ) { _, session ->
                     val isCurrent = session.sessionId == currentSessionId
                     Card(
-                        modifier = Modifier.width(240.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isCurrent) {
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-                            } else if (session.isFavorite) {
-                                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
-                            } else {
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
-                            },
+                        modifier = Modifier.width(sizes.playerSessionCardWidth),
+                        colors = VodrSurfaceStyles.sessionCardColors(
+                            isCurrent = isCurrent,
+                            isFavorite = session.isFavorite,
                         ),
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(spacing.md),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 DocumentArtworkCover(
                                     title = session.documentTitle,
                                     sourceUri = session.documentSourceUri,
                                     mimeType = session.documentMimeType,
-                                    modifier = Modifier.size(width = 52.dp, height = 72.dp),
+                                    modifier = Modifier.size(
+                                        width = sizes.playerSessionArtworkWidth,
+                                        height = sizes.playerSessionArtworkHeight,
+                                    ),
                                 )
                                 Column(
                                     modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(spacing.xxs),
                                 ) {
                                     Text(
                                         text = session.documentTitle,
@@ -426,7 +420,7 @@ private fun ListeningSessionsCard(
                                 progress = { session.progressFraction.coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                                 if (session.isFavorite) {
                                     AssistChip(
                                         onClick = {},
@@ -498,26 +492,37 @@ private fun ChapterTimelineMarkers(
     onSelectChapter: (Int) -> Unit,
 ) {
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(VodrUiTheme.spacing.xs),
     ) {
         itemsIndexed(
             items = queue,
             key = { _, chapter -> chapter.id },
         ) { index, chapter ->
             val isSelected = index == currentChapterIndex
+            val sizes = VodrUiTheme.sizes
+            val spacing = VodrUiTheme.spacing
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs - spacing.xxxs),
             ) {
                 Box(
                     modifier = Modifier
-                        .size(width = 34.dp, height = if (isSelected) 18.dp else 12.dp)
+                        .size(
+                            width = sizes.timelineMarkerWidth,
+                            height = if (isSelected) {
+                                sizes.timelineMarkerSelectedHeight
+                            } else {
+                                sizes.timelineMarkerHeight
+                            },
+                        )
                         .clip(MaterialTheme.shapes.small)
                         .background(
                             if (isSelected) {
                                 MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.28f)
+                                MaterialTheme.colorScheme.surfaceTint.copy(
+                                    alpha = VodrUiTheme.alpha.inactiveMarker,
+                                )
                             },
                         )
                         .clickable { onSelectChapter(index) },
@@ -552,17 +557,17 @@ private fun PlayerHeroCard(
     playbackStatusLabel: String,
     runtimeMetadata: PlaybackRuntimeMetadata?,
 ) {
+    val spacing = VodrUiTheme.spacing
+    val sizes = VodrUiTheme.sizes
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-        ),
+        colors = VodrSurfaceStyles.heroCardColors(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm + spacing.xxs),
         ) {
             Box(
                 modifier = Modifier.fillMaxWidth(),
@@ -573,13 +578,16 @@ private fun PlayerHeroCard(
                         title = documentTitle,
                         sourceUri = documentSourceUri,
                         mimeType = documentMimeType,
-                        modifier = Modifier.size(width = 144.dp, height = 192.dp),
+                        modifier = Modifier.size(
+                            width = sizes.heroArtworkWidth,
+                            height = sizes.heroArtworkHeight,
+                        ),
                         shape = MaterialTheme.shapes.large,
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(128.dp)
+                            .size(sizes.heroPlaceholderSize)
                             .semantics {
                                 contentDescription = "Current chapter artwork placeholder"
                             },
@@ -630,7 +638,7 @@ private fun PlayerHeroCard(
                 text = listeningLabel,
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                 AssistChip(
                     onClick = {},
                     label = {
@@ -645,7 +653,7 @@ private fun PlayerHeroCard(
             if (runtimeMetadata?.personalizationProviderLabel != null ||
                 runtimeMetadata?.transcriptionProviderLabel != null
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     runtimeMetadata.personalizationProviderLabel?.let { label ->
                         AssistChip(
                             onClick = {},

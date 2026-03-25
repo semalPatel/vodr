@@ -56,6 +56,7 @@ import com.vodr.player.PlayerViewModel
 import com.vodr.player.ui.PlayerScreen
 import com.vodr.ui.CompactPlaybackIconButton
 import com.vodr.ui.DocumentArtworkCover
+import com.vodr.ui.theme.VodrUiTheme
 
 sealed interface VodrRoute {
     val route: String
@@ -87,6 +88,7 @@ private fun NavHostController.navigateTo(
 fun VodrNavHost(
     navController: NavHostController = rememberNavController(),
 ) {
+    val spacing = VodrUiTheme.spacing
     val context = LocalContext.current
     val libraryViewModel: LibraryViewModel = viewModel()
     val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
@@ -122,7 +124,7 @@ fun VodrNavHost(
             startDestination = VodrNavRoutes.startDestination,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = if (showMiniPlayer) 92.dp else 0.dp),
+                .padding(bottom = if (showMiniPlayer) spacing.bottomBarClearance else 0.dp),
         ) {
             composable(VodrRoute.Library.route) {
                 LibraryScreen(
@@ -224,7 +226,10 @@ fun VodrNavHost(
                 onSkipNext = playerViewModel::goToNextChapter,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(
+                        horizontal = spacing.miniPlayerInsetHorizontal,
+                        vertical = spacing.miniPlayerInsetVertical,
+                    ),
             )
         }
     }
@@ -288,21 +293,25 @@ private fun MiniPlayerBar(
     onSkipNext: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = VodrUiTheme.spacing
+    val sizes = VodrUiTheme.sizes
+    val elevation = VodrUiTheme.elevation
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onOpenPlayer),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation.floatingCard),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(
+                    horizontal = spacing.miniPlayerInsetHorizontal,
+                    vertical = spacing.miniPlayerContentVertical,
+                ),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -315,13 +324,16 @@ private fun MiniPlayerBar(
                         sourceUri = documentSourceUri,
                         mimeType = documentMimeType,
                         modifier = Modifier
-                            .size(width = 52.dp, height = 68.dp)
-                            .padding(end = 12.dp),
+                            .size(
+                                width = sizes.miniPlayerArtworkWidth,
+                                height = sizes.miniPlayerArtworkHeight,
+                            )
+                            .padding(end = spacing.sm),
                     )
                 }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(spacing.xxxs),
                 ) {
                     Text(
                         text = "Now playing",
@@ -347,7 +359,7 @@ private fun MiniPlayerBar(
                     )
                 }
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CompactPlaybackIconButton(

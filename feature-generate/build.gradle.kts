@@ -40,6 +40,7 @@ dependencies {
     implementation(project(":core-parser"))
     implementation(project(":core-playback"))
     implementation(project(":core-segmentation"))
+    implementation(project(":core-ui"))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.compose.material3)

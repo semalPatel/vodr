@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,7 +31,6 @@ import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -56,13 +54,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vodr.library.ImportDocumentRequest
 import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.PlaybackActionButton
+import com.vodr.ui.theme.VodrSurfaceStyles
+import com.vodr.ui.theme.VodrUiTheme
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,6 +84,7 @@ fun LibraryScreen(
     onToggleRecentSessionFavorite: (String, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
+    val spacing = VodrUiTheme.spacing
     val context = LocalContext.current
     val state = viewModel.state.collectAsStateWithLifecycle().value
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
@@ -146,8 +146,8 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = spacing.xl, vertical = spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 Text(
                     text = "New Book",
@@ -224,8 +224,8 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(horizontal = spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 LibraryHeroCard(
                     documentCount = state.documents.size,
@@ -281,8 +281,8 @@ fun LibraryScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(vertical = spacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
                         ) {
                             items(
                                 items = state.documents,
@@ -293,9 +293,7 @@ fun LibraryScreen(
                                         .fillMaxWidth()
                                         .animateContentSize()
                                         .clickable(onClick = onOpenGenerate),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                                    ),
+                                    colors = VodrSurfaceStyles.subtleCardColors(),
                                 ) {
                                     LibraryDocumentCardContent(document = document)
                                 }
@@ -327,17 +325,16 @@ private fun LibraryHeroCard(
     isImporting: Boolean,
     onOpenGenerate: () -> Unit,
 ) {
+    val spacing = VodrUiTheme.spacing
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-        ),
+        colors = VodrSurfaceStyles.heroCardColors(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Text(
                 text = "Your listening library",
@@ -353,7 +350,7 @@ private fun LibraryHeroCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AssistChip(
@@ -382,31 +379,34 @@ private fun ContinueListeningCard(
     onResumePlayback: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
+    val spacing = VodrUiTheme.spacing
+    val sizes = VodrUiTheme.sizes
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.68f),
-        ),
+        colors = VodrSurfaceStyles.accentCardColors(),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize()
-                .padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(spacing.md + spacing.xxs),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm + spacing.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DocumentArtworkCover(
                 title = documentTitle,
                 sourceUri = documentSourceUri,
                 mimeType = documentMimeType,
-                modifier = Modifier.size(width = 70.dp, height = 96.dp),
+                modifier = Modifier.size(
+                    width = sizes.continueArtworkWidth,
+                    height = sizes.continueArtworkHeight,
+                ),
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -475,8 +475,7 @@ private fun FavoriteSessionsSection(
         title = "Favorites",
         subtitle = "Keep your best books one tap away.",
         sessions = sessions,
-        containerAlpha = 0.68f,
-        useSecondaryContainer = true,
+        emphasized = true,
         onOpenSession = onOpenSession,
         onRemoveSession = onRemoveSession,
         onToggleFavorite = onToggleFavorite,
@@ -494,8 +493,7 @@ private fun RecentSessionsSection(
         title = "Recent listening sessions",
         subtitle = "Jump back into saved books without regenerating.",
         sessions = sessions,
-        containerAlpha = 0.35f,
-        useSecondaryContainer = false,
+        emphasized = false,
         onOpenSession = onOpenSession,
         onRemoveSession = onRemoveSession,
         onToggleFavorite = onToggleFavorite,
@@ -507,13 +505,14 @@ private fun SessionShelfSection(
     title: String,
     subtitle: String,
     sessions: List<RecentListeningSessionItem>,
-    containerAlpha: Float,
-    useSecondaryContainer: Boolean,
+    emphasized: Boolean,
     onOpenSession: (String) -> Unit,
     onRemoveSession: ((String) -> Unit)?,
     onToggleFavorite: (String, Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val spacing = VodrUiTheme.spacing
+    val sizes = VodrUiTheme.sizes
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
@@ -523,41 +522,38 @@ private fun SessionShelfSection(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             itemsIndexed(
                 items = sessions,
                 key = { _, session -> session.sessionId },
             ) { _, session ->
                 Card(
                     modifier = Modifier
-                        .width(260.dp)
+                        .width(sizes.libraryShelfCardWidth)
                         .animateContentSize()
                         .clickable { onOpenSession(session.sessionId) },
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (useSecondaryContainer) {
-                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = containerAlpha)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = containerAlpha)
-                        },
-                    ),
+                    colors = VodrSurfaceStyles.shelfCardColors(emphasized = emphasized),
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             DocumentArtworkCover(
                                 title = session.documentTitle,
                                 sourceUri = session.documentSourceUri,
                                 mimeType = session.documentMimeType,
-                                modifier = Modifier.size(width = 56.dp, height = 76.dp),
+                                modifier = Modifier.size(
+                                    width = sizes.sessionArtworkWidth,
+                                    height = sizes.sessionArtworkHeight,
+                                ),
                             )
                             Column(
                                 modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(spacing.xxs),
                             ) {
                                 Text(
                                     text = session.documentTitle,
@@ -583,7 +579,7 @@ private fun SessionShelfSection(
                             progress = { session.progressFraction.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                             if (session.isFavorite) {
                                 AssistChip(
                                     onClick = {},
@@ -609,7 +605,7 @@ private fun SessionShelfSection(
                                 )
                             }
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                             TextButton(onClick = { onOpenSession(session.sessionId) }) {
                                 Icon(
                                     imageVector = Icons.Rounded.PlayArrow,
@@ -658,16 +654,15 @@ private fun SessionShelfSection(
 private fun EmptyLibraryCard(
     onAddBook: () -> Unit,
 ) {
+    val spacing = VodrUiTheme.spacing
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        ),
+        colors = VodrSurfaceStyles.subtleCardColors(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Text(
                 text = "No books yet",
@@ -689,23 +684,28 @@ private fun EmptyLibraryCard(
 private fun LibraryDocumentCardContent(
     document: ImportedDocument,
 ) {
+    val spacing = VodrUiTheme.spacing
+    val sizes = VodrUiTheme.sizes
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DocumentArtworkCover(
             title = document.metadata.displayName,
             sourceUri = document.metadata.sourceUri,
             mimeType = document.metadata.mimeType,
-            modifier = Modifier.size(width = 56.dp, height = 72.dp),
+            modifier = Modifier.size(
+                width = sizes.documentArtworkWidth,
+                height = sizes.documentArtworkHeight,
+            ),
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Text(
                 text = document.metadata.displayName,
@@ -718,7 +718,7 @@ private fun LibraryDocumentCardContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                 AssistChip(
                     onClick = {},
                     label = {

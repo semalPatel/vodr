@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,12 +31,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.vodr.ai.toDisplayName
 import com.vodr.generate.GenerationPhase
 import com.vodr.generate.GenerationMode
 import com.vodr.generate.GenerationUiState
 import com.vodr.generate.toUserMessage
+import com.vodr.ui.theme.VodrSurfaceStyles
+import com.vodr.ui.theme.VodrUiTheme
 
 data class GenerationSourceDocument(
     val id: String,
@@ -53,6 +53,7 @@ fun GenerateScreen(
     onOpenPlayer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = VodrUiTheme.spacing
     var selectedDocumentId by remember(documents) {
         mutableStateOf(documents.firstOrNull()?.id)
     }
@@ -73,8 +74,8 @@ fun GenerateScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 if (documents.isEmpty()) {
                     Text(text = "Import a PDF/EPUB in Library first.")
@@ -149,10 +150,9 @@ fun GenerateScreen(
 private fun GenerationStatusCard(
     generationState: GenerationUiState,
 ) {
+    val spacing = VodrUiTheme.spacing
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        ),
+        colors = VodrSurfaceStyles.mutedCardColors(),
     ) {
         val animatedProgress by animateFloatAsState(
             targetValue = generationState.phase.progress,
@@ -162,14 +162,14 @@ private fun GenerationStatusCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Crossfade(
                 targetState = generationState.phase,
                 label = "generation-phase-copy",
             ) { phase ->
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     Text(
                         text = phase.title,
                         style = MaterialTheme.typography.titleLarge,
@@ -188,7 +188,7 @@ private fun GenerationStatusCard(
                 )
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
                 AssistChip(
                     onClick = {},

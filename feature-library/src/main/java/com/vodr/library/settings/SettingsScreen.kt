@@ -18,10 +18,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.ai.PersonalizationProviderType
+import com.vodr.ui.theme.VodrUiTheme
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +30,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(),
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
+    val spacing = VodrUiTheme.spacing
 
     Scaffold(
         modifier = modifier,
@@ -41,8 +42,8 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
                 Text(
                     text = "Voice",
@@ -88,7 +89,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     PersonalizationProviderType.entries.forEach { providerType ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
