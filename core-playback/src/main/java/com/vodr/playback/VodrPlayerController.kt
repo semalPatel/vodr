@@ -96,6 +96,8 @@ interface VodrPlayerController {
     fun selectChapter(chapterIndex: Int)
 
     fun restoreSession(sessionId: String)
+
+    fun removeSession(sessionId: String)
 }
 
 class InMemoryVodrPlayerController : VodrPlayerController {
@@ -237,6 +239,14 @@ class InMemoryVodrPlayerController : VodrPlayerController {
                     sourceUri = target.documentSourceUri,
                     mimeType = target.documentMimeType,
                 ),
+            )
+        }
+    }
+
+    override fun removeSession(sessionId: String) {
+        mutableState.update { current ->
+            current.copy(
+                sessionHistory = current.sessionHistory.filterNot { it.sessionId == sessionId },
             )
         }
     }

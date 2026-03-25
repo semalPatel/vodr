@@ -129,6 +129,17 @@ class ForegroundVodrPlayerController @Inject constructor(
         dispatchAction(VodrPlaybackService.ACTION_SYNC_QUEUE)
     }
 
+    override fun removeSession(sessionId: String) {
+        val currentSessionId = state.value.toPlaybackSessionSnapshot()?.sessionId
+        if (currentSessionId == sessionId) {
+            return
+        }
+        val history = sessionStore.remove(sessionId)
+        mutableState.update { current ->
+            current.copy(sessionHistory = history.toSessionHistory())
+        }
+    }
+
     internal fun snapshot(): PlaybackState = state.value
 
     internal fun updateFromService(state: PlaybackState) {

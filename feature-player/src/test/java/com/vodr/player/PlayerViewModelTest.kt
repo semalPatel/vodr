@@ -131,6 +131,16 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun removeSessionDelegatesToController() {
+        val controller = FakeVodrPlayerController()
+        val viewModel = PlayerViewModel(controller)
+
+        viewModel.removeSession("content://book/two")
+
+        assertEquals("content://book/two", controller.removedSessionId)
+    }
+
+    @Test
     fun updatingQueueForNewDocument_resetsChapterAndResumePosition() {
         val viewModel = PlayerViewModel(FakeVodrPlayerController())
 
@@ -170,6 +180,7 @@ class PlayerViewModelTest {
 
         var selectChapterCalled: Boolean = false
         var restoredSessionId: String? = null
+        var removedSessionId: String? = null
 
         override fun updateQueue(
             queue: List<PlaybackChapter>,
@@ -244,6 +255,10 @@ class PlayerViewModelTest {
 
         override fun restoreSession(sessionId: String) {
             restoredSessionId = sessionId
+        }
+
+        override fun removeSession(sessionId: String) {
+            removedSessionId = sessionId
         }
     }
 }

@@ -78,6 +78,7 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit = {},
     onResumePlayback: () -> Unit = {},
     onOpenRecentSession: (String) -> Unit = {},
+    onRemoveRecentSession: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -234,6 +235,7 @@ fun LibraryScreen(
                     RecentSessionsSection(
                         sessions = recentSessions,
                         onOpenSession = onOpenRecentSession,
+                        onRemoveSession = onRemoveRecentSession,
                     )
                 }
                 Text(
@@ -414,6 +416,7 @@ private fun ContinueListeningCard(
 private fun RecentSessionsSection(
     sessions: List<RecentListeningSessionItem>,
     onOpenSession: (String) -> Unit,
+    onRemoveSession: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -488,6 +491,14 @@ private fun RecentSessionsSection(
                                     onClick = {},
                                     label = { Text(text = "Transcript: $label") },
                                 )
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { onOpenSession(session.sessionId) }) {
+                                Text(text = "Open")
+                            }
+                            TextButton(onClick = { onRemoveSession(session.sessionId) }) {
+                                Text(text = "Remove")
                             }
                         }
                     }

@@ -152,6 +152,7 @@ fun VodrNavHost(
                         playerViewModel.restoreSession(sessionId)
                         navController.navigateTo(VodrRoute.Player)
                     },
+                    onRemoveRecentSession = playerViewModel::removeSession,
                 )
             }
             composable(VodrRoute.Generate.route) {
@@ -188,7 +189,6 @@ fun VodrNavHost(
             }
             composable(VodrRoute.Player.route) {
                 PlayerScreen(
-                    queue = generationState.queue,
                     viewModel = playerViewModel,
                 )
             }

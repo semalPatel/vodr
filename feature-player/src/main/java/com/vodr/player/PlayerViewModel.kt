@@ -71,4 +71,8 @@ class PlayerViewModel @Inject constructor(
     fun restoreSession(sessionId: String) {
         controller.restoreSession(sessionId)
     }
+
+    fun removeSession(sessionId: String) {
+        controller.removeSession(sessionId)
+    }
 }

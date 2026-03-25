@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AssistChip
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +57,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vodr.parser.DocumentArtworkLoader
 import com.vodr.playback.PlaybackChapter
 import com.vodr.playback.PlaybackRuntimeMetadata
+import com.vodr.playback.PlaybackSessionSummary
 import com.vodr.playback.PlaybackStatus
 import com.vodr.player.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -63,16 +66,9 @@ import kotlinx.coroutines.withContext
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun PlayerScreen(
-    queue: List<PlaybackChapter> = emptyList(),
     viewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
 ) {
-    LaunchedEffect(queue) {
-        if (queue.isNotEmpty()) {
-            viewModel.updateQueue(queue)
-        }
-    }
-
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val currentChapter = state.currentChapter
     val chapterProgressTarget = if (state.queue.isEmpty()) {
@@ -111,6 +107,7 @@ fun PlayerScreen(
     val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
         state.playbackStatus == PlaybackStatus.PREPARING
     var isChapterMenuExpanded by remember { mutableStateOf(false) }
+    val currentSessionId = state.sessionHistory.firstOrNull()?.sessionId
 
     Scaffold(
         modifier = modifier,
@@ -139,6 +136,14 @@ fun PlayerScreen(
                     playbackStatusLabel = state.playbackStatus.toReadableLabel(),
                     runtimeMetadata = state.runtimeMetadata,
                 )
+                if (state.sessionHistory.isNotEmpty()) {
+                    ListeningSessionsCard(
+                        sessions = state.sessionHistory,
+                        currentSessionId = currentSessionId,
+                        onRestoreSession = viewModel::restoreSession,
+                        onRemoveSession = viewModel::removeSession,
+                    )
+                }
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -318,6 +323,115 @@ fun PlayerScreen(
 }
 
 @Composable
+private fun ListeningSessionsCard(
+    sessions: List<PlaybackSessionSummary>,
+    currentSessionId: String?,
+    onRestoreSession: (String) -> Unit,
+    onRemoveSession: (String) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Listening sessions",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Switch between saved books without regenerating the queue.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                itemsIndexed(
+                    items = sessions,
+                    key = { _, session -> session.sessionId },
+                ) { _, session ->
+                    val isCurrent = session.sessionId == currentSessionId
+                    Card(
+                        modifier = Modifier.width(240.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isCurrent) {
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
+                            } else {
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
+                            },
+                        ),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                SessionArtworkThumbnail(
+                                    title = session.documentTitle,
+                                    sourceUri = session.documentSourceUri,
+                                    mimeType = session.documentMimeType,
+                                    modifier = Modifier.size(width = 52.dp, height = 72.dp),
+                                )
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        text = session.documentTitle,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = session.chapterTitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = session.updatedAtEpochMs.toSessionUpdatedLabel(
+                                            isCurrent = isCurrent,
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            LinearProgressIndicator(
+                                progress = { session.progressFraction.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(
+                                    onClick = { onRestoreSession(session.sessionId) },
+                                    enabled = !isCurrent,
+                                ) {
+                                    Text(text = if (isCurrent) "Current session" else "Switch")
+                                }
+                                if (!isCurrent) {
+                                    TextButton(onClick = { onRemoveSession(session.sessionId) }) {
+                                        Text(text = "Remove")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChapterTimelineMarkers(
     queue: List<PlaybackChapter>,
     currentChapterIndex: Int,
@@ -359,6 +473,41 @@ private fun ChapterTimelineMarkers(
                     maxLines = 1,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SessionArtworkThumbnail(
+    title: String,
+    sourceUri: String,
+    mimeType: String,
+    modifier: Modifier = Modifier,
+) {
+    val bitmap by rememberDocumentArtworkBitmap(
+        title = title,
+        sourceUri = sourceUri,
+        mimeType = mimeType,
+    )
+    if (bitmap != null) {
+        Image(
+            bitmap = requireNotNull(bitmap).asImageBitmap(),
+            contentDescription = "$title cover art",
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(MaterialTheme.shapes.medium),
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = title.take(2).uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
         }
     }
 }
@@ -579,3 +728,20 @@ private fun formatPlaybackTime(durationMs: Long): String {
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
 }
+
+private fun Long.toSessionUpdatedLabel(
+    isCurrent: Boolean,
+    nowEpochMs: Long = System.currentTimeMillis(),
+): String {
+    if (isCurrent) {
+        return "Current session"
+    }
+    val dayDelta = ((nowEpochMs - this).coerceAtLeast(0L) / DAY_IN_MS).toInt()
+    return when (dayDelta) {
+        0 -> "Updated today"
+        1 -> "Updated yesterday"
+        else -> "Updated ${dayDelta}d ago"
+    }
+}
+
+private const val DAY_IN_MS: Long = 24L * 60L * 60L * 1_000L

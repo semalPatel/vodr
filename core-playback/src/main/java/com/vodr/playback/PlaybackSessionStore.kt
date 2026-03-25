@@ -317,6 +317,12 @@ class PlaybackSessionStore @Inject constructor(
         return updated
     }
 
+    internal fun remove(sessionId: String): List<PlaybackSessionSnapshot> {
+        val updated = loadHistory().filterNot { it.sessionId == sessionId }
+        saveHistory(updated)
+        return updated
+    }
+
     internal fun clear() {
         runCatching {
             if (sessionFile.exists()) {
