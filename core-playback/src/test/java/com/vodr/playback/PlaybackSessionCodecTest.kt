@@ -34,10 +34,13 @@ class PlaybackSessionCodecTest {
                 personalizationDetail = "Using on-device model",
                 transcriptionProviderLabel = "Offline Heuristic",
                 transcriptionDetail = "Offline-only fallback active",
+                narrationProviderLabel = "Studio Warm",
+                narrationDetail = "Offline voice pack",
             ),
             currentChapterIndex = 1,
             resumePositionMs = 42_000L,
             playbackSpeed = 1.25f,
+            resumeWhenReady = true,
         )
 
         val restored = PlaybackSessionCodec.decode(
@@ -81,6 +84,7 @@ class PlaybackSessionCodecTest {
             runtimeMetadata = PlaybackRuntimeMetadata(
                 personalizationProviderLabel = "Device AI",
                 transcriptionProviderLabel = "Offline Heuristic",
+                narrationProviderLabel = "Studio Warm",
             ),
             currentChapterIndex = 0,
             resumePositionMs = 1_200L,

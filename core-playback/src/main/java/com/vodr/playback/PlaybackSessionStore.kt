@@ -16,6 +16,7 @@ internal data class PlaybackSessionSnapshot(
     val currentChapterIndex: Int,
     val resumePositionMs: Long,
     val playbackSpeed: Float,
+    val resumeWhenReady: Boolean = false,
 )
 
 internal object PlaybackSessionCodec {
@@ -54,6 +55,10 @@ internal object PlaybackSessionCodec {
                 append(escape(metadata.transcriptionProviderLabel.orEmpty()))
                 append('\t')
                 append(escape(metadata.transcriptionDetail.orEmpty()))
+                append('\t')
+                append(escape(metadata.narrationProviderLabel.orEmpty()))
+                append('\t')
+                append(escape(metadata.narrationDetail.orEmpty()))
                 appendLine()
             }
             append("STATE")
@@ -63,6 +68,8 @@ internal object PlaybackSessionCodec {
             append(snapshot.resumePositionMs)
             append('\t')
             append(snapshot.playbackSpeed)
+            append('\t')
+            append(if (snapshot.resumeWhenReady) '1' else '0')
             appendLine()
             snapshot.queue.forEach { chapter ->
                 append("CHAPTER")
@@ -93,6 +100,7 @@ internal object PlaybackSessionCodec {
         var currentChapterIndex = 0
         var resumePositionMs = 0L
         var playbackSpeed = PlaybackState.DEFAULT_PLAYBACK_SPEED
+        var resumeWhenReady = false
         val queue = mutableListOf<PlaybackChapter>()
 
         lines.drop(1).forEach { line ->
@@ -123,6 +131,7 @@ internal object PlaybackSessionCodec {
                     playbackSpeed = tokens.getOrNull(3)?.toFloatOrNull()
                         ?.coerceIn(0.75f, 2.0f)
                         ?: PlaybackState.DEFAULT_PLAYBACK_SPEED
+                    resumeWhenReady = tokens.getOrNull(4) == "1"
                 }
 
                 "RUNTIME" -> {
@@ -137,6 +146,12 @@ internal object PlaybackSessionCodec {
                             ?.let(::unescape)
                             .orNullIfBlank(),
                         transcriptionDetail = tokens.getOrNull(4)
+                            ?.let(::unescape)
+                            .orNullIfBlank(),
+                        narrationProviderLabel = tokens.getOrNull(5)
+                            ?.let(::unescape)
+                            .orNullIfBlank(),
+                        narrationDetail = tokens.getOrNull(6)
                             ?.let(::unescape)
                             .orNullIfBlank(),
                     )
@@ -170,6 +185,7 @@ internal object PlaybackSessionCodec {
             currentChapterIndex = currentChapterIndex.coerceIn(0, queue.lastIndex),
             resumePositionMs = resumePositionMs.coerceAtLeast(0L),
             playbackSpeed = playbackSpeed,
+            resumeWhenReady = resumeWhenReady,
         )
     }
 
@@ -417,6 +433,7 @@ internal fun PlaybackState.toPlaybackSessionSnapshot(
         currentChapterIndex = currentChapterIndex,
         resumePositionMs = resumePositionMs,
         playbackSpeed = playbackSpeed,
+        resumeWhenReady = resumeWhenReady,
     )
 }
 
@@ -440,6 +457,7 @@ internal fun PlaybackSessionSnapshot.toPlaybackState(
         } ?: 0L,
         playbackSpeed = clampedSpeed,
         playbackStatus = PlaybackStatus.PAUSED,
+        resumeWhenReady = resumeWhenReady,
         isVoiceReady = false,
         errorMessage = null,
     )
@@ -481,11 +499,12 @@ internal fun List<PlaybackSessionSnapshot>.toSessionHistory(): List<PlaybackSess
             isFavorite = snapshot.isFavorite,
             personalizationProviderLabel = snapshot.runtimeMetadata?.personalizationProviderLabel,
             transcriptionProviderLabel = snapshot.runtimeMetadata?.transcriptionProviderLabel,
+            narrationProviderLabel = snapshot.runtimeMetadata?.narrationProviderLabel,
         )
     }
 }
 
-private fun deriveSessionId(
+internal fun deriveSessionId(
     activeDocument: PlaybackDocument?,
     queue: List<PlaybackChapter>,
 ): String {

@@ -28,4 +28,11 @@ data class ChapterEntity(
     val documentId: Long,
     val indexInDocument: Int,
     val title: String,
+    val sourceText: String = "",
+    val renderedAudioPath: String? = null,
+    val renderStatus: String = "pending",
+    val renderedBy: String? = null,
+    val voicePackId: String? = null,
+    val estimatedDurationMs: Long = 0L,
+    val updatedAtEpochMs: Long = 0L,
 )

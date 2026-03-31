@@ -39,4 +39,8 @@ data class ChunkEntity(
     val text: String,
     val startOffset: Int,
     val endOffset: Int,
+    val narrationStyle: String = "NEUTRAL",
+    val pauseAfterMs: Long = 0L,
+    val renderedAudioPath: String? = null,
+    val renderStatus: String = "pending",
 )

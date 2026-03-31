@@ -31,10 +31,13 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.media)
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
     implementation(libs.hilt.android)
+    implementation(project(":core-data"))
+    implementation(project(":core-tts"))
 
     kapt(libs.hilt.android.compiler)
 

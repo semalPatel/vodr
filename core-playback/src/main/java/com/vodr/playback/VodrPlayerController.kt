@@ -22,6 +22,8 @@ data class PlaybackRuntimeMetadata(
     val personalizationDetail: String? = null,
     val transcriptionProviderLabel: String? = null,
     val transcriptionDetail: String? = null,
+    val narrationProviderLabel: String? = null,
+    val narrationDetail: String? = null,
 )
 
 data class PlaybackSessionSummary(
@@ -35,6 +37,7 @@ data class PlaybackSessionSummary(
     val isFavorite: Boolean = false,
     val personalizationProviderLabel: String? = null,
     val transcriptionProviderLabel: String? = null,
+    val narrationProviderLabel: String? = null,
 )
 
 enum class PlaybackStatus {
@@ -55,6 +58,7 @@ data class PlaybackState(
     val currentChapterDurationMs: Long = 0L,
     val playbackSpeed: Float = DEFAULT_PLAYBACK_SPEED,
     val playbackStatus: PlaybackStatus = PlaybackStatus.IDLE,
+    val resumeWhenReady: Boolean = false,
     val isVoiceReady: Boolean = false,
     val errorMessage: String? = null,
 ) {
@@ -136,6 +140,7 @@ class InMemoryVodrPlayerController : VodrPlayerController {
                     )
                 } ?: 0L,
                 playbackStatus = if (queue.isEmpty()) PlaybackStatus.IDLE else current.playbackStatus,
+                resumeWhenReady = if (queue.isEmpty()) false else current.resumeWhenReady,
                 errorMessage = null,
             )
         }
@@ -146,6 +151,7 @@ class InMemoryVodrPlayerController : VodrPlayerController {
             mutableState.update {
                 it.copy(
                     playbackStatus = PlaybackStatus.PLAYING,
+                    resumeWhenReady = true,
                     isVoiceReady = true,
                     errorMessage = null,
                 )
@@ -155,7 +161,10 @@ class InMemoryVodrPlayerController : VodrPlayerController {
 
     override fun pause() {
         mutableState.update {
-            it.copy(playbackStatus = PlaybackStatus.PAUSED)
+            it.copy(
+                playbackStatus = PlaybackStatus.PAUSED,
+                resumeWhenReady = false,
+            )
         }
     }
 

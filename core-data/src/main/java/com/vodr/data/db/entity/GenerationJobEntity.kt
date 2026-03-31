@@ -28,7 +28,12 @@ data class GenerationJobEntity(
     @ColumnInfo(name = "documentId")
     val documentId: Long,
     val jobType: String,
+    val chapterIndex: Int = 0,
+    val chunkIndex: Int = 0,
+    val waveIndex: Int = 0,
+    val providerLabel: String = "",
     val status: String,
+    val errorMessage: String? = null,
     val createdAtEpochMs: Long,
     val updatedAtEpochMs: Long,
 )

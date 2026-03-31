@@ -21,7 +21,7 @@ import com.vodr.data.db.entity.UserSettingsEntity
         GenerationJobEntity::class,
         UserSettingsEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class VodrDatabase : RoomDatabase() {

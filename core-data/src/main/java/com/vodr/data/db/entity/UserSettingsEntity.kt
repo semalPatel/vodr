@@ -15,6 +15,11 @@ data class UserSettingsEntity(
     val customEndpoint: String = DEFAULT_CUSTOM_ENDPOINT,
     val customModelName: String = DEFAULT_CUSTOM_MODEL_NAME,
     val offlineOnly: Boolean = DEFAULT_OFFLINE_ONLY,
+    val narrationProviderType: String = DEFAULT_NARRATION_PROVIDER_TYPE,
+    val selectedVoicePackId: String = DEFAULT_SELECTED_VOICE_PACK_ID,
+    val voicePackUrl: String = DEFAULT_VOICE_PACK_URL,
+    val cloudNarrationEndpoint: String = DEFAULT_CLOUD_NARRATION_ENDPOINT,
+    val cloudNarrationModelName: String = DEFAULT_CLOUD_NARRATION_MODEL_NAME,
 ) {
     companion object {
         const val DEFAULT_SETTINGS_ID: Long = 1L
@@ -26,5 +31,10 @@ data class UserSettingsEntity(
         const val DEFAULT_CUSTOM_ENDPOINT: String = ""
         const val DEFAULT_CUSTOM_MODEL_NAME: String = ""
         const val DEFAULT_OFFLINE_ONLY: Boolean = true
+        const val DEFAULT_NARRATION_PROVIDER_TYPE: String = "AUTO"
+        const val DEFAULT_SELECTED_VOICE_PACK_ID: String = ""
+        const val DEFAULT_VOICE_PACK_URL: String = ""
+        const val DEFAULT_CLOUD_NARRATION_ENDPOINT: String = ""
+        const val DEFAULT_CLOUD_NARRATION_MODEL_NAME: String = ""
     }
 }

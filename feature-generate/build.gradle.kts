@@ -1,7 +1,9 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt.android)
 }
 
 android {
@@ -37,6 +39,7 @@ dependencies {
 
     implementation(composeBom)
     implementation(project(":core-ai"))
+    implementation(project(":core-data"))
     implementation(project(":core-parser"))
     implementation(project(":core-playback"))
     implementation(project(":core-segmentation"))
@@ -46,6 +49,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
+    implementation(libs.hilt.android)
+
+    kapt(libs.hilt.android.compiler)
 
     testImplementation(libs.junit4)
 }

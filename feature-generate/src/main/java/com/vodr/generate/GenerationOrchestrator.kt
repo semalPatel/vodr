@@ -7,9 +7,9 @@ import com.vodr.ai.PersonalizationProbeRegistry
 import com.vodr.ai.PersonalizationRouter
 import com.vodr.ai.MediaPipeRuntimeProbe
 import com.vodr.ai.AICoreRuntimeProbe
+import com.vodr.ai.ChapterLabelRouter
 import com.vodr.ai.CustomEndpointRuntimeProbe
 import com.vodr.ai.CustomLocalModelRuntimeProbe
-import com.vodr.ai.TranscriptionRouter
 import com.vodr.ai.provider.AICorePersonalizer
 import com.vodr.ai.provider.CustomEndpointPersonalizer
 import com.vodr.ai.provider.CustomLocalModelPersonalizer
@@ -19,8 +19,10 @@ import com.vodr.parser.DocumentParser
 import com.vodr.parser.ParsedDocument
 import com.vodr.playback.PlaybackChapter
 import com.vodr.segmentation.ChunkPolicy
+import com.vodr.segmentation.SegmentedChunk
 import com.vodr.segmentation.Segmenter
 import java.io.InputStream
+import javax.inject.Inject
 
 data class GenerationDocumentInput(
     val id: String,
@@ -39,13 +41,16 @@ data class GenerationRuntimeSummary(
 data class GenerationOutput(
     val queue: List<PlaybackChapter>,
     val runtimeSummary: GenerationRuntimeSummary,
+    val segments: List<SegmentedChunk>,
+    val renderJobs: List<GenerationJob>,
 )
 
-class GenerationOrchestrator(
-    private val parser: DocumentParser = DocumentParser(),
-    private val segmenter: Segmenter = Segmenter(policy = ChunkPolicy(maxCharsPerChunk = 400)),
-    private val deviceCapabilityDetector: DefaultDeviceCapabilityDetector = DefaultDeviceCapabilityDetector(),
-    private val probeRegistry: PersonalizationProbeRegistry = PersonalizationProbeRegistry(
+class GenerationOrchestrator @Inject constructor() {
+    private val parser = DocumentParser()
+    private val segmenter = Segmenter(policy = ChunkPolicy(maxCharsPerChunk = 400))
+    private val generationWorker = GenerationWorker()
+    private val deviceCapabilityDetector = DefaultDeviceCapabilityDetector()
+    private val probeRegistry = PersonalizationProbeRegistry(
         probes = listOf(
             AICoreRuntimeProbe(deviceCapabilityDetector),
             MediaPipeRuntimeProbe(deviceCapabilityDetector),
@@ -53,8 +58,8 @@ class GenerationOrchestrator(
             CustomEndpointRuntimeProbe(),
             OfflineHeuristicRuntimeProbe(),
         ),
-    ),
-    private val personalizationRouter: PersonalizationRouter = PersonalizationRouter(
+    )
+    private val personalizationRouter = PersonalizationRouter(
         deviceCapabilityDetector = deviceCapabilityDetector,
         aICorePersonalizer = AICorePersonalizer(),
         mediaPipePersonalizer = MediaPipePersonalizer(),
@@ -62,11 +67,11 @@ class GenerationOrchestrator(
         customEndpointPersonalizer = CustomEndpointPersonalizer(),
         heuristicPersonalizer = HeuristicPersonalizer(),
         probeRegistry = probeRegistry,
-    ),
-    private val transcriptionRouter: TranscriptionRouter = TranscriptionRouter(
+    )
+    private val chapterLabelRouter = ChapterLabelRouter(
         probeRegistry = probeRegistry,
-    ),
-) {
+    )
+
     fun buildPlaybackQueue(
         document: GenerationDocumentInput,
         mode: GenerationMode,
@@ -87,7 +92,7 @@ class GenerationOrchestrator(
         if (chapterTexts.isEmpty()) {
             throw IllegalStateException("No readable chapters were found in the selected document.")
         }
-        segmenter.segment(
+        val segmentedChunks = segmenter.segment(
             documentId = document.id,
             chapters = chapterTexts,
         )
@@ -99,7 +104,7 @@ class GenerationOrchestrator(
         val personalizationSelection = personalizationRouter.resolve(
             preferences = personalizationPreferences,
         )
-        val transcriptionSelection = transcriptionRouter.resolve(
+        val transcriptionSelection = chapterLabelRouter.resolve(
             preferences = personalizationPreferences,
         )
         onProgress(GenerationPhase.BUILDING_QUEUE)
@@ -117,6 +122,12 @@ class GenerationOrchestrator(
                 personalizationDetail = personalizationSelection.detail,
                 transcriptionProvider = transcriptionSelection.providerType,
                 transcriptionDetail = transcriptionSelection.detail,
+            ),
+            segments = segmentedChunks,
+            renderJobs = generationWorker.schedule(
+                documentId = document.id,
+                mode = mode,
+                chunkCount = segmentedChunks.size,
             ),
         )
     }

@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vodr.ai.PersonalizationPreferences
 import com.vodr.playback.PlaybackChapter
+import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.InputStream
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,10 +31,12 @@ data class GeneratedDocumentSummary(
     val mimeType: String,
 )
 
-class GenerationViewModel(
-    private val orchestrator: GenerationOrchestrator = GenerationOrchestrator(),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+@HiltViewModel
+class GenerationViewModel @Inject constructor(
+    private val orchestrator: GenerationOrchestrator,
+    private val generationPersistenceRepository: GenerationPersistenceRepository,
 ) : ViewModel() {
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     private val mutableState = MutableStateFlow(GenerationUiState())
     val state: StateFlow<GenerationUiState> = mutableState.asStateFlow()
 
@@ -58,7 +62,7 @@ class GenerationViewModel(
                     val inputStream = openInputStream(document)
                         ?: throw DocumentStreamUnavailableException()
                     inputStream.use {
-                        orchestrator.buildPlaybackQueue(
+                        val output = orchestrator.buildPlaybackQueue(
                             document = document,
                             mode = mode,
                             personalizationPreferences = personalizationPreferences,
@@ -69,6 +73,16 @@ class GenerationViewModel(
                                 }
                             },
                         )
+                        document.id.toLongOrNull()?.let { documentId ->
+                            generationPersistenceRepository.persistPlan(
+                                documentId = documentId,
+                                queue = output.queue,
+                                chunks = output.segments,
+                                jobs = output.renderJobs,
+                                runtimeSummary = output.runtimeSummary,
+                            )
+                        }
+                        output
                     }
                 }
             }

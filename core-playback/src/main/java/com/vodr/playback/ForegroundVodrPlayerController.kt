@@ -50,6 +50,7 @@ class ForegroundVodrPlayerController @Inject constructor(
                     )
                 } ?: 0L,
                 playbackStatus = if (queue.isEmpty()) PlaybackStatus.IDLE else current.playbackStatus,
+                resumeWhenReady = if (queue.isEmpty()) false else current.resumeWhenReady,
                 errorMessage = null,
             )
         }
@@ -62,6 +63,7 @@ class ForegroundVodrPlayerController @Inject constructor(
             mutableState.update {
                 it.copy(
                     playbackStatus = PlaybackStatus.PREPARING,
+                    resumeWhenReady = true,
                     errorMessage = null,
                 )
             }
@@ -71,6 +73,13 @@ class ForegroundVodrPlayerController @Inject constructor(
     }
 
     override fun pause() {
+        mutableState.update {
+            it.copy(
+                playbackStatus = PlaybackStatus.PAUSED,
+                resumeWhenReady = false,
+            )
+        }
+        persistCurrentState()
         dispatchAction(VodrPlaybackService.ACTION_PAUSE)
     }
 
