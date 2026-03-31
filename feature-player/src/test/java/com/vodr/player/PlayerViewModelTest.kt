@@ -155,6 +155,26 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun clearAllDelegatesToController() {
+        val controller = FakeVodrPlayerController()
+        val viewModel = PlayerViewModel(controller)
+
+        viewModel.clearAll()
+
+        assertTrue(controller.clearAllCalled)
+    }
+
+    @Test
+    fun removeDocumentSessionsDelegatesToController() {
+        val controller = FakeVodrPlayerController()
+        val viewModel = PlayerViewModel(controller)
+
+        viewModel.removeDocumentSessions("content://book/four")
+
+        assertEquals("content://book/four", controller.removedDocumentSourceUri)
+    }
+
+    @Test
     fun updatingQueueForNewDocument_resetsChapterAndResumePosition() {
         val viewModel = PlayerViewModel(FakeVodrPlayerController())
 
@@ -195,8 +215,10 @@ class PlayerViewModelTest {
         var selectChapterCalled: Boolean = false
         var restoredSessionId: String? = null
         var removedSessionId: String? = null
+        var removedDocumentSourceUri: String? = null
         var favoriteSessionId: String? = null
         var favoriteSessionValue: Boolean? = null
+        var clearAllCalled: Boolean = false
 
         override fun updateQueue(
             queue: List<PlaybackChapter>,
@@ -283,6 +305,15 @@ class PlayerViewModelTest {
         ) {
             favoriteSessionId = sessionId
             favoriteSessionValue = isFavorite
+        }
+
+        override fun removeDocumentSessions(sourceUri: String) {
+            removedDocumentSourceUri = sourceUri
+        }
+
+        override fun clearAll() {
+            clearAllCalled = true
+            mutableState.value = PlaybackState()
         }
     }
 }

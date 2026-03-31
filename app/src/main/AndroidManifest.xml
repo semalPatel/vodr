@@ -5,6 +5,7 @@
 
     <application
         android:name=".VodrApplication"
+        android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:label="Vodr">
         <activity

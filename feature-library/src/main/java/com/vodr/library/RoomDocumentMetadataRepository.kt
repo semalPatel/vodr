@@ -37,6 +37,14 @@ class RoomDocumentMetadataRepository @Inject constructor(
             entities.map { it.toImportedDocument() }
         }
     }
+
+    override suspend fun delete(documentId: Long) {
+        documentDao.deleteById(documentId)
+    }
+
+    override suspend fun clearAll() {
+        documentDao.clearAll()
+    }
 }
 
 private fun DocumentEntity.toImportedDocument(): ImportedDocument {

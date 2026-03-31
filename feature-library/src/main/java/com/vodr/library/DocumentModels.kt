@@ -29,6 +29,8 @@ data class ImportedDocument(
 interface DocumentMetadataRepository {
     suspend fun save(metadata: DocumentMetadata): ImportedDocument
     fun observeAll(): Flow<List<ImportedDocument>>
+    suspend fun delete(documentId: Long)
+    suspend fun clearAll()
 }
 
 class InMemoryDocumentMetadataRepository : DocumentMetadataRepository {
@@ -47,4 +49,14 @@ class InMemoryDocumentMetadataRepository : DocumentMetadataRepository {
     }
 
     override fun observeAll(): Flow<List<ImportedDocument>> = documentsFlow.asStateFlow()
+
+    override suspend fun delete(documentId: Long) {
+        documents.removeAll { it.id == documentId }
+        documentsFlow.value = documents.toList()
+    }
+
+    override suspend fun clearAll() {
+        documents.clear()
+        documentsFlow.value = emptyList()
+    }
 }

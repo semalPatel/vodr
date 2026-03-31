@@ -18,6 +18,7 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -28,5 +29,9 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.pdfbox.android)
+
+    testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
 }

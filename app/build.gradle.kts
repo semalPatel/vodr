@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.room.runtime)
     implementation(libs.hilt.android)
+    implementation(libs.pdfbox.android)
     implementation(project(":core-ai"))
     implementation(project(":core-data"))
     implementation(project(":core-playback"))

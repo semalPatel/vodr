@@ -1,18 +1,34 @@
 package com.vodr.parser
 
+import androidx.test.core.app.ApplicationProvider
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class DocumentParserTest {
 
     private val parser = DocumentParser()
 
+    @Before
+    fun setUp() {
+        PDFBoxResourceLoader.init(ApplicationProvider.getApplicationContext())
+    }
+
     @Test
     fun parsesGoldenPdfWithChapterMarkers() {
-        val input = requireNotNull(javaClass.getResourceAsStream("/samples/sample.pdf")) {
-            "Missing PDF sample"
-        }
+        val input = createSamplePdfInputStream()
 
         val result = parser.parse(input, "application/pdf")
 
@@ -48,5 +64,41 @@ class DocumentParserTest {
             ),
             result.chapters.map { it.title },
         )
+    }
+
+    @Test
+    fun sanitizeExtractedPdfText_removesBinaryControlNoise() {
+        val sanitized = sanitizeExtractedPdfText(
+            "Hello\u0000\u0007World\uFFFD",
+        )
+
+        assertEquals("Hello  World ", sanitized)
+    }
+
+    private fun createSamplePdfInputStream(): ByteArrayInputStream {
+        val output = ByteArrayOutputStream()
+        PDDocument().use { document ->
+            val page = PDPage(PDRectangle.LETTER)
+            document.addPage(page)
+            PDPageContentStream(document, page).use { content ->
+                content.beginText()
+                content.setFont(PDType1Font.HELVETICA, 12f)
+                content.newLineAtOffset(72f, 720f)
+                listOf(
+                    "Chapter 1: Getting Started",
+                    "This is the first PDF chapter.",
+                    "Chapter 2: Deep Dive",
+                    "More PDF details follow.",
+                ).forEachIndexed { index, line ->
+                    if (index > 0) {
+                        content.newLineAtOffset(0f, -18f)
+                    }
+                    content.showText(line)
+                }
+                content.endText()
+            }
+            document.save(output)
+        }
+        return ByteArrayInputStream(output.toByteArray())
     }
 }

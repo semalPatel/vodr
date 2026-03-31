@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 data class LibraryUiState(
     val documents: List<ImportedDocument> = emptyList(),
     val lastImportedDocumentId: Long? = null,
+    val lastDeletedDocumentSourceUri: String? = null,
     val errorMessage: String? = null,
     val isImporting: Boolean = false,
 )
@@ -59,6 +60,7 @@ class LibraryViewModel @Inject constructor(
                     mutableState.update {
                         it.copy(
                             lastImportedDocumentId = document.id,
+                            lastDeletedDocumentSourceUri = null,
                             errorMessage = null,
                             isImporting = false,
                         )
@@ -87,6 +89,66 @@ class LibraryViewModel @Inject constructor(
     fun consumeLastImportedDocument() {
         mutableState.update {
             it.copy(lastImportedDocumentId = null)
+        }
+    }
+
+    fun consumeLastDeletedDocument() {
+        mutableState.update {
+            it.copy(lastDeletedDocumentSourceUri = null)
+        }
+    }
+
+    fun deleteDocument(document: ImportedDocument) {
+        scope.launch {
+            runCatching {
+                importDocumentUseCase.deleteDocument(document.id)
+            }.fold(
+                onSuccess = {
+                    mutableState.update {
+                        it.copy(
+                            lastImportedDocumentId = null,
+                            lastDeletedDocumentSourceUri = document.metadata.sourceUri,
+                            errorMessage = null,
+                            isImporting = false,
+                        )
+                    }
+                },
+                onFailure = { exception ->
+                    mutableState.update {
+                        it.copy(
+                            errorMessage = exception.message ?: "Unable to delete the selected book.",
+                            isImporting = false,
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun clearLibrary() {
+        scope.launch {
+            runCatching {
+                importDocumentUseCase.clearAllDocuments()
+            }.fold(
+                onSuccess = {
+                    mutableState.update {
+                        it.copy(
+                            lastImportedDocumentId = null,
+                            lastDeletedDocumentSourceUri = null,
+                            errorMessage = null,
+                            isImporting = false,
+                        )
+                    }
+                },
+                onFailure = { exception ->
+                    mutableState.update {
+                        it.copy(
+                            errorMessage = exception.message ?: "Unable to clear the library.",
+                            isImporting = false,
+                        )
+                    }
+                },
+            )
         }
     }
 

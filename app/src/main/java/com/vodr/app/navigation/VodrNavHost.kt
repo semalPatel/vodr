@@ -134,7 +134,7 @@ fun VodrNavHost(
                     continueListeningDocumentMimeType = playerState.activeDocument?.mimeType,
                     continueListeningChapterTitle = playerState.currentChapter?.title,
                     continueListeningProgress = playbackProgress,
-                    continueListeningStatus = playerState.playbackStatus.toMiniPlayerLabel(),
+                    continueListeningStatus = playerState.errorMessage ?: playerState.playbackStatus.toMiniPlayerLabel(),
                     continueListeningIsFavorite = playerState.sessionHistory.firstOrNull()?.isFavorite == true,
                     recentSessions = playerState.sessionHistory.drop(1).map { it.toRecentListeningSessionItem() },
                     onOpenGenerate = {
@@ -164,6 +164,16 @@ fun VodrNavHost(
                             sessionId = sessionId,
                             isFavorite = isFavorite,
                         )
+                    },
+                    onDeleteLibraryDocumentData = { sourceUri ->
+                        if (generationState.activeDocument?.sourceUri == sourceUri) {
+                            generationViewModel.clearQueue()
+                        }
+                        playerViewModel.removeDocumentSessions(sourceUri)
+                    },
+                    onClearLibraryData = {
+                        generationViewModel.clearQueue()
+                        playerViewModel.clearAll()
                     },
                 )
             }
@@ -216,7 +226,7 @@ fun VodrNavHost(
                 documentMimeType = playerState.activeDocument?.mimeType,
                 chapterTitle = playerState.currentChapter?.title.orEmpty(),
                 progress = playbackProgress,
-                status = playerState.playbackStatus.toMiniPlayerLabel(),
+                status = playerState.errorMessage ?: playerState.playbackStatus.toMiniPlayerLabel(),
                 isPlaying = playerState.playbackStatus == PlaybackStatus.PLAYING ||
                     playerState.playbackStatus == PlaybackStatus.PREPARING,
                 onOpenPlayer = {
@@ -335,11 +345,6 @@ private fun MiniPlayerBar(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(spacing.xxxs),
                 ) {
-                    Text(
-                        text = "Now playing",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
                     Text(
                         text = documentTitle,
                         style = MaterialTheme.typography.titleSmall,

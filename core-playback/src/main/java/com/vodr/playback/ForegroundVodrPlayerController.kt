@@ -153,6 +153,23 @@ class ForegroundVodrPlayerController @Inject constructor(
         }
     }
 
+    override fun removeDocumentSessions(sourceUri: String) {
+        val history = sessionStore.removeBySourceUri(sourceUri)
+        val shouldClearActiveDocument = state.value.activeDocument?.sourceUri == sourceUri
+        mutableState.value = if (shouldClearActiveDocument) {
+            PlaybackState(sessionHistory = history.toSessionHistory())
+        } else {
+            state.value.copy(sessionHistory = history.toSessionHistory())
+        }
+        dispatchAction(VodrPlaybackService.ACTION_SYNC_QUEUE)
+    }
+
+    override fun clearAll() {
+        sessionStore.clear()
+        mutableState.value = PlaybackState()
+        dispatchAction(VodrPlaybackService.ACTION_SYNC_QUEUE)
+    }
+
     internal fun snapshot(): PlaybackState = state.value
 
     internal fun updateFromService(state: PlaybackState) {

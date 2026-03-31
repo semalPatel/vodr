@@ -13,6 +13,7 @@ robolectric = "4.13"
 lifecycle = "2.9.4"
 androidxMedia = "1.7.1"
 media3 = "1.9.3"
+pdfboxAndroid = "2.0.27.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -41,6 +42,7 @@ hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", ve
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

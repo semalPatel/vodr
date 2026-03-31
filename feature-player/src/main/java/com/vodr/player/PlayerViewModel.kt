@@ -85,4 +85,12 @@ class PlayerViewModel @Inject constructor(
             isFavorite = isFavorite,
         )
     }
+
+    fun removeDocumentSessions(sourceUri: String) {
+        controller.removeDocumentSessions(sourceUri)
+    }
+
+    fun clearAll() {
+        controller.clearAll()
+    }
 }

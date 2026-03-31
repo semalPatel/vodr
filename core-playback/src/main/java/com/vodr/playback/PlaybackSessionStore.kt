@@ -336,6 +336,14 @@ class PlaybackSessionStore @Inject constructor(
         return updated
     }
 
+    internal fun removeBySourceUri(sourceUri: String): List<PlaybackSessionSnapshot> {
+        val updated = loadHistory().filterNot { snapshot ->
+            snapshot.activeDocument?.sourceUri == sourceUri
+        }
+        saveHistory(updated)
+        return updated
+    }
+
     internal fun setFavorite(
         sessionId: String,
         isFavorite: Boolean,

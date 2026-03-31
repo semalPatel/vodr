@@ -16,6 +16,7 @@ import com.vodr.ai.provider.CustomLocalModelPersonalizer
 import com.vodr.ai.provider.HeuristicPersonalizer
 import com.vodr.ai.provider.MediaPipePersonalizer
 import com.vodr.parser.DocumentParser
+import com.vodr.parser.ParsedDocument
 import com.vodr.playback.PlaybackChapter
 import com.vodr.segmentation.ChunkPolicy
 import com.vodr.segmentation.Segmenter
@@ -83,9 +84,16 @@ class GenerationOrchestrator(
             fullText = parsed.text,
             starts = parsed.chapters.map { it.startOffset },
         )
-        val chunks = segmenter.segment(
+        if (chapterTexts.isEmpty()) {
+            throw IllegalStateException("No readable chapters were found in the selected document.")
+        }
+        segmenter.segment(
             documentId = document.id,
             chapters = chapterTexts,
+        )
+        val chapterTitles = toChapterTitles(
+            parsed = parsed,
+            chapterTexts = chapterTexts,
         )
         onProgress(GenerationPhase.RESOLVING_PROVIDERS)
         val personalizationSelection = personalizationRouter.resolve(
@@ -94,29 +102,11 @@ class GenerationOrchestrator(
         val transcriptionSelection = transcriptionRouter.resolve(
             preferences = personalizationPreferences,
         )
-        val promptBuilder = personalizationRouter.select(
-            preferences = personalizationPreferences,
-        )
-        val transcriptionEngine = transcriptionRouter.select(
-            preferences = personalizationPreferences,
-        )
         onProgress(GenerationPhase.BUILDING_QUEUE)
         val queue = chapterTexts.indices.map { chapterIndex ->
-            val chapterChunkCount = chunks.count { it.chapterIndex == chapterIndex }
-            val chapterPreview = chapterTexts[chapterIndex].take(60)
-            val prompt = promptBuilder.buildPrompt(
-                inputText = chapterPreview,
-                tone = "neutral",
-                style = mode.name.lowercase(),
-                customProviderConfig = personalizationPreferences.customProviderConfig,
-            )
-            val transcriptLabel = transcriptionEngine.transcribe(
-                sourceText = chapterTexts[chapterIndex].take(240),
-                customProviderConfig = personalizationPreferences.customProviderConfig,
-            )
             PlaybackChapter(
                 id = "${document.id}-$chapterIndex",
-                title = "Chapter ${chapterIndex + 1}: ${transcriptLabel.take(24)} (${chapterChunkCount} chunks) ${prompt.take(16)}",
+                title = chapterTitles[chapterIndex],
                 text = chapterTexts[chapterIndex],
             )
         }
@@ -133,15 +123,74 @@ class GenerationOrchestrator(
 
     private fun toChapterTexts(fullText: String, starts: List<Int>): List<String> {
         if (starts.isEmpty()) {
-            return listOf(fullText)
+            return listOf(fullText).filter { it.isNotBlank() }
         }
         val sorted = starts.distinct().sorted().filter { it in fullText.indices }
         if (sorted.isEmpty()) {
-            return listOf(fullText)
+            return listOf(fullText).filter { it.isNotBlank() }
         }
         return sorted.mapIndexed { index, start ->
             val end = if (index + 1 < sorted.size) sorted[index + 1] else fullText.length
             fullText.substring(start, end).trim()
         }.filter { it.isNotBlank() }
     }
+
+    private fun toChapterTitles(
+        parsed: ParsedDocument,
+        chapterTexts: List<String>,
+    ): List<String> {
+        val markerTitles = parsed.chapters
+            .sortedBy { it.startOffset }
+            .distinctBy { it.startOffset }
+            .map { it.title.sanitizeVisibleChapterTitle() }
+        return chapterTexts.mapIndexed { index, chapterText ->
+            buildReadableChapterTitle(
+                explicitTitle = markerTitles.getOrNull(index),
+                chapterText = chapterText,
+                chapterIndex = index,
+            )
+        }
+    }
+}
+
+internal fun buildReadableChapterTitle(
+    explicitTitle: String?,
+    chapterText: String,
+    chapterIndex: Int,
+): String {
+    explicitTitle?.sanitizeVisibleChapterTitle()?.let { return it }
+    val fallbackLabel = deriveFallbackChapterLabel(chapterText)
+    return if (fallbackLabel == null) {
+        "Section ${chapterIndex + 1}"
+    } else {
+        "Section ${chapterIndex + 1}: $fallbackLabel"
+    }
+}
+
+internal fun deriveFallbackChapterLabel(chapterText: String): String? {
+    val firstLine = chapterText.lineSequence()
+        .map(String::trim)
+        .firstOrNull { it.isNotBlank() }
+        .orEmpty()
+    val firstSentence = firstLine
+        .split('.', '!', '?')
+        .firstOrNull()
+        .orEmpty()
+        .trim()
+        .ifBlank { firstLine }
+    return firstSentence
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+        .take(8)
+        .joinToString(" ")
+        .sanitizeVisibleChapterTitle()
+        ?.takeIf { it.isNotBlank() }
+}
+
+private fun String.sanitizeVisibleChapterTitle(): String? {
+    return trim()
+        .replace(Regex("\\s+"), " ")
+        .trim(' ', '.', ',', ';', ':', '-', '•')
+        .take(72)
+        .takeIf { it.isNotBlank() }
 }

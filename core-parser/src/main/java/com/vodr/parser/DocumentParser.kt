@@ -26,11 +26,14 @@ class DocumentParser(
 }
 
 internal fun buildParsedDocument(lines: List<String>): ParsedDocument {
-    val text = lines.joinToString(separator = "\n")
+    val normalizedLines = lines
+        .map(::sanitizeDocumentLine)
+        .filter { it.isNotBlank() }
+    val text = normalizedLines.joinToString(separator = "\n")
     val chapters = mutableListOf<ChapterMarker>()
     var offset = 0
 
-    for (line in lines) {
+    for (line in normalizedLines) {
         if (isChapterHeading(line)) {
             chapters += ChapterMarker(title = line, startOffset = offset)
         }
@@ -45,10 +48,27 @@ internal fun normalizeDocumentLines(text: String): List<String> {
         .replace("\r\n", "\n")
         .replace('\r', '\n')
         .split('\n')
-        .map { it.replace(Regex("\\s+"), " ").trim() }
+        .map(::sanitizeDocumentLine)
         .filter { it.isNotBlank() }
 }
 
 internal fun isChapterHeading(line: String): Boolean {
-    return line.matches(Regex("""Chapter\s+\d+[:.].*"""))
+    return CHAPTER_HEADING_REGEXES.any { pattern ->
+        pattern.matches(line)
+    }
 }
+
+internal fun sanitizeDocumentLine(line: String): String {
+    return line
+        .replace(NON_TEXT_CHARACTER_REGEX, " ")
+        .replace(WHITESPACE_REGEX, " ")
+        .trim()
+}
+
+private val WHITESPACE_REGEX = Regex("\\s+")
+private val NON_TEXT_CHARACTER_REGEX = Regex("[\\u0000\\uFFFD]")
+private val CHAPTER_HEADING_REGEXES = listOf(
+    Regex("""(?i)^chapter\s+\d+([:. -].*)?$"""),
+    Regex("""(?i)^part\s+([ivxlcdm]+|\d+)([:. -].*)?$"""),
+    Regex("""(?i)^(prologue|epilogue|introduction|preface|foreword|conclusion)$"""),
+)

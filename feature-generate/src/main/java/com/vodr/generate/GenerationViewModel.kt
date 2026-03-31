@@ -56,7 +56,7 @@ class GenerationViewModel(
             val result = runCatching {
                 withContext(ioDispatcher) {
                     val inputStream = openInputStream(document)
-                        ?: throw IllegalStateException("Document stream unavailable")
+                        ?: throw DocumentStreamUnavailableException()
                     inputStream.use {
                         orchestrator.buildPlaybackQueue(
                             document = document,
@@ -106,7 +106,7 @@ class GenerationViewModel(
                     GenerationUiState(
                         isGenerating = false,
                         queue = emptyList(),
-                        error = if (error is IllegalStateException) {
+                        error = if (error is DocumentStreamUnavailableException || error is SecurityException) {
                             GenerationError.DocumentOpenFailure
                         } else {
                             GenerationError.ProcessingFailure(error.message)
@@ -123,10 +123,15 @@ class GenerationViewModel(
     fun clearQueue() {
         mutableState.update {
             it.copy(
+                isGenerating = false,
                 queue = emptyList(),
+                error = null,
+                runtimeSummary = null,
                 phase = GenerationPhase.IDLE,
                 activeDocument = null,
             )
         }
     }
 }
+
+private class DocumentStreamUnavailableException : IllegalStateException("Document stream unavailable")

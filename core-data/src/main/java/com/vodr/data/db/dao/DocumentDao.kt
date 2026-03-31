@@ -20,4 +20,11 @@ interface DocumentDao {
 
     @Query("SELECT * FROM documents ORDER BY importedAtEpochMs DESC, updatedAtEpochMs DESC")
     fun observeAll(): Flow<List<DocumentEntity>>
+
+    @Query("DELETE FROM documents WHERE documentId = :documentId")
+    suspend fun deleteById(documentId: Long)
+
+    @Query("DELETE FROM documents")
+    suspend fun clearAll()
 }
+    

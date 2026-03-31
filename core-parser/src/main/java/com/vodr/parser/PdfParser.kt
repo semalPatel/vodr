@@ -1,56 +1,44 @@
 package com.vodr.parser
 
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.InputStream
-import java.nio.charset.Charset
 
 class PdfParser {
 
     fun parse(inputStream: InputStream): ParsedDocument {
-        val raw = inputStream.readBytes().toString(PDF_CHARSET)
-        val fragments = extractTextFragments(raw)
-        val lines = normalizeDocumentLines(fragments.joinToString(separator = "\n"))
+        val extractedText = runCatching {
+            val pdfBytes = inputStream.readBytes()
+            require(pdfBytes.isNotEmpty()) { "PDF file is empty." }
+            PDDocument.load(pdfBytes).use { document ->
+                if (document.isEncrypted && !document.currentAccessPermission.canExtractContent()) {
+                    throw IllegalStateException("This PDF blocks text extraction.")
+                }
+                PDFTextStripper().apply {
+                    sortByPosition = true
+                }.getText(document)
+            }
+        }.getOrElse { error ->
+            throw IllegalStateException("Unable to read this PDF as text.", error)
+        }
+        val lines = normalizeDocumentLines(
+            sanitizeExtractedPdfText(extractedText),
+        )
+        if (lines.isEmpty()) {
+            throw IllegalStateException(
+                "This PDF does not contain readable text. If it is a scanned document, export it with OCR first."
+            )
+        }
         return buildParsedDocument(lines)
     }
-
-    private fun extractTextFragments(raw: String): List<String> {
-        val fragments = mutableListOf<String>()
-        val pattern = Regex("""\((?:\\.|[^\\)])*\)""")
-        for (match in pattern.findAll(raw)) {
-            fragments += unescapePdfString(match.value.drop(1).dropLast(1))
-        }
-        return fragments
-    }
-
-    private fun unescapePdfString(value: String): String {
-        val builder = StringBuilder(value.length)
-        var index = 0
-        while (index < value.length) {
-            val character = value[index]
-            if (character == '\\' && index + 1 < value.length) {
-                val escaped = value[index + 1]
-                builder.append(
-                    when (escaped) {
-                        'n' -> '\n'
-                        'r' -> '\r'
-                        't' -> '\t'
-                        'b' -> '\b'
-                        'f' -> '\u000C'
-                        '\\' -> '\\'
-                        '(' -> '('
-                        ')' -> ')'
-                        else -> escaped
-                    },
-                )
-                index += 2
-            } else {
-                builder.append(character)
-                index += 1
-            }
-        }
-        return builder.toString()
-    }
-
-    private companion object {
-        private val PDF_CHARSET: Charset = Charsets.ISO_8859_1
-    }
 }
+
+internal fun sanitizeExtractedPdfText(text: String): String {
+    return text
+        .replace(NON_RENDERED_CONTROL_REGEX, " ")
+        .replace('\u0000', ' ')
+        .replace('\uFFFD', ' ')
+        .replace('\u00A0', ' ')
+}
+
+private val NON_RENDERED_CONTROL_REGEX = Regex("[\\u0001-\\u0008\\u000B\\u000C\\u000E-\\u001F]")

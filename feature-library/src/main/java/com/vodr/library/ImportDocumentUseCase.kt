@@ -33,6 +33,14 @@ class ImportDocumentUseCase @Inject constructor(
 
     fun observeDocuments(): Flow<List<ImportedDocument>> = repository.observeAll()
 
+    suspend fun deleteDocument(documentId: Long) {
+        repository.delete(documentId)
+    }
+
+    suspend fun clearAllDocuments() {
+        repository.clearAll()
+    }
+
     companion object {
         private val SUPPORTED_MIME_TYPES = setOf("application/pdf", "application/epub+zip")
     }

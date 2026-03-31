@@ -1,5 +1,6 @@
 package com.vodr.library.ui
 
+import android.content.Intent
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -32,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,11 +53,9 @@ import com.vodr.library.ImportedDocument
 import com.vodr.library.LibraryViewModel
 import com.vodr.ui.VodrArtworkListRow
 import com.vodr.ui.VodrChoiceChip
-import com.vodr.ui.DocumentArtworkCover
 import com.vodr.ui.VodrEmptyStateCard
 import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.VodrMetaChip
-import com.vodr.ui.PlaybackActionButton
 import com.vodr.ui.VodrMessageText
 import com.vodr.ui.VodrMessageTone
 import com.vodr.ui.VodrScreenColumn
@@ -85,20 +86,50 @@ fun LibraryScreen(
     onOpenRecentSession: (String) -> Unit = {},
     onRemoveRecentSession: (String) -> Unit = {},
     onToggleRecentSessionFavorite: (String, Boolean) -> Unit = { _, _ -> },
+    onDeleteLibraryDocumentData: (String) -> Unit = {},
+    onClearLibraryData: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val spacing = VodrUiTheme.spacing
     val context = LocalContext.current
     val state = viewModel.state.collectAsStateWithLifecycle().value
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
-    val favoriteSessions = recentSessions.filter { it.isFavorite }
-    val recentNonFavoriteSessions = recentSessions.filterNot { it.isFavorite }
+    var showClearLibraryDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingDeleteDocumentId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val hasContinueListening = continueListeningDocumentTitle != null &&
+        continueListeningDocumentSourceUri != null &&
+        continueListeningDocumentMimeType != null
+    val displayedSessions = recentSessions.sortedWith(
+        compareByDescending<RecentListeningSessionItem> { it.isFavorite }
+            .thenByDescending { it.updatedAtEpochMs },
+    )
+    val showEmptyLibraryState = state.documents.isEmpty() &&
+        displayedSessions.isEmpty() &&
+        !hasContinueListening
+    val hasSavedLibraryData = state.documents.isNotEmpty() ||
+        displayedSessions.isNotEmpty() ||
+        hasContinueListening
+    val pendingDeleteDocument = state.documents.firstOrNull { it.id == pendingDeleteDocumentId }
 
     LaunchedEffect(state.lastImportedDocumentId) {
         if (state.lastImportedDocumentId != null) {
             onOpenGenerate()
             viewModel.consumeLastImportedDocument()
         }
+    }
+    LaunchedEffect(state.lastDeletedDocumentSourceUri) {
+        val deletedSourceUri = state.lastDeletedDocumentSourceUri ?: return@LaunchedEffect
+        releasePersistedReadPermission(
+            sourceUri = deletedSourceUri,
+            releaseReadPermission = { uri ->
+                context.contentResolver.releasePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            },
+        )
+        onDeleteLibraryDocumentData(deletedSourceUri)
+        viewModel.consumeLastDeletedDocument()
     }
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -107,6 +138,12 @@ fun LibraryScreen(
             return@rememberLauncherForActivityResult
         }
         val contentResolver = context.contentResolver
+        runCatching {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
         val detectedMimeType = contentResolver.getType(uri)
         var displayName = uri.lastPathSegment ?: "document"
         var byteCount: Long? = null
@@ -140,6 +177,72 @@ fun LibraryScreen(
         } else {
             viewModel.reportUnsupportedSelection()
         }
+    }
+
+    pendingDeleteDocument?.let { document ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteDocumentId = null },
+            title = {
+                Text(text = "Delete book?")
+            },
+            text = {
+                Text(text = "Remove ${document.metadata.displayName} from your library and clear its saved listening session.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDeleteDocumentId = null
+                        viewModel.deleteDocument(document)
+                    },
+                ) {
+                    Text(text = "Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteDocumentId = null }) {
+                    Text(text = "Cancel")
+                }
+            },
+        )
+    }
+
+    if (showClearLibraryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearLibraryDialog = false },
+            title = {
+                Text(text = "Clear library?")
+            },
+            text = {
+                Text(text = "This removes all imported books and saved listening sessions from this device.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearLibraryDialog = false
+                        state.documents.forEach { document ->
+                            releasePersistedReadPermission(
+                                sourceUri = document.metadata.sourceUri,
+                                releaseReadPermission = { uri ->
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                    )
+                                },
+                            )
+                        }
+                        viewModel.clearLibrary()
+                        onClearLibraryData()
+                    },
+                ) {
+                    Text(text = "Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearLibraryDialog = false }) {
+                    Text(text = "Cancel")
+                }
+            },
+        )
     }
 
     if (showAddSheet) {
@@ -196,6 +299,13 @@ fun LibraryScreen(
         title = "Library",
         modifier = modifier,
         actions = {
+            if (hasSavedLibraryData) {
+                VodrInlineAction(
+                    label = "Clear",
+                    onClick = { showClearLibraryDialog = true },
+                    icon = Icons.Rounded.DeleteOutline,
+                )
+            }
             VodrInlineAction(
                 label = "Settings",
                 onClick = onOpenSettings,
@@ -221,19 +331,17 @@ fun LibraryScreen(
             contentPadding = contentPadding,
             fillMaxSize = true,
         ) {
-            LibraryHeroCard(
-                documentCount = state.documents.size,
-                isImporting = state.isImporting,
-                onOpenGenerate = onOpenGenerate,
-            )
-            if (continueListeningDocumentTitle != null &&
-                continueListeningDocumentSourceUri != null &&
-                continueListeningDocumentMimeType != null
-            ) {
+            state.errorMessage?.let {
+                VodrMessageText(
+                    text = it,
+                    tone = VodrMessageTone.ERROR,
+                )
+            }
+            if (hasContinueListening) {
                 ContinueListeningCard(
-                    documentTitle = continueListeningDocumentTitle,
-                    documentSourceUri = continueListeningDocumentSourceUri,
-                    documentMimeType = continueListeningDocumentMimeType,
+                    documentTitle = continueListeningDocumentTitle!!,
+                    documentSourceUri = continueListeningDocumentSourceUri!!,
+                    documentMimeType = continueListeningDocumentMimeType!!,
                     chapterTitle = continueListeningChapterTitle,
                     progress = continueListeningProgress,
                     status = continueListeningStatus ?: "Ready",
@@ -242,53 +350,48 @@ fun LibraryScreen(
                     onToggleFavorite = onToggleContinueFavorite,
                 )
             }
-            if (favoriteSessions.isNotEmpty()) {
-                FavoriteSessionsSection(
-                    sessions = favoriteSessions,
+            if (displayedSessions.isNotEmpty()) {
+                SessionShelfSection(
+                    title = "Listening",
+                    subtitle = null,
+                    sessions = displayedSessions,
+                    emphasized = displayedSessions.any { it.isFavorite },
                     onOpenSession = onOpenRecentSession,
                     onRemoveSession = onRemoveRecentSession,
                     onToggleFavorite = onToggleRecentSessionFavorite,
                 )
             }
-            if (recentNonFavoriteSessions.isNotEmpty()) {
-                RecentSessionsSection(
-                    sessions = recentNonFavoriteSessions,
-                    onOpenSession = onOpenRecentSession,
-                    onRemoveSession = onRemoveRecentSession,
-                    onToggleFavorite = onToggleRecentSessionFavorite,
-                )
-            }
-            VodrSectionHeader(
-                title = "Recently opened books",
-            )
-            state.errorMessage?.let {
-                VodrMessageText(
-                    text = it,
-                    tone = VodrMessageTone.ERROR,
-                )
-            }
-            VodrCrossfade(targetState = state.documents.isEmpty(), label = "library-empty-list") { isEmpty ->
+            VodrCrossfade(targetState = showEmptyLibraryState, label = "library-empty-list") { isEmpty ->
                 if (isEmpty) {
                     EmptyLibraryCard(
                         onAddBook = { showAddSheet = true },
                     )
                 } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(vertical = spacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                    ) {
-                        items(
-                            items = state.documents,
-                            key = { it.id },
-                        ) { document ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .vodrAnimateContentSize()
-                                    .clickable(onClick = onOpenGenerate),
-                                colors = VodrSurfaceStyles.subtleCardColors(),
-                            ) {
-                                LibraryDocumentCardContent(document = document)
+                    if (state.documents.isNotEmpty()) {
+                        VodrSectionHeader(
+                            title = "Books",
+                        )
+                        LazyColumn(
+                            contentPadding = PaddingValues(vertical = spacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                        ) {
+                            items(
+                                items = state.documents,
+                                key = { it.id },
+                            ) { document ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .vodrAnimateContentSize()
+                                        .clickable(onClick = onOpenGenerate),
+                                    colors = VodrSurfaceStyles.subtleCardColors(),
+                                ) {
+                                    LibraryDocumentCardContent(
+                                        document = document,
+                                        onOpenGenerate = onOpenGenerate,
+                                        onDelete = { pendingDeleteDocumentId = document.id },
+                                    )
+                                }
                             }
                         }
                     }
@@ -312,53 +415,6 @@ data class RecentListeningSessionItem(
 )
 
 @Composable
-private fun LibraryHeroCard(
-    documentCount: Int,
-    isImporting: Boolean,
-    onOpenGenerate: () -> Unit,
-) {
-    val spacing = VodrUiTheme.spacing
-    Card(
-        colors = VodrSurfaceStyles.heroCardColors(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .vodrAnimateContentSize()
-                .padding(spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Text(
-                text = "Your listening library",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = if (documentCount == 0) {
-                    "Import a book to create your first offline-ready listening session."
-                } else {
-                    "$documentCount imported book${if (documentCount == 1) "" else "s"} ready for generation and playback."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                VodrMetaChip(
-                    label = if (isImporting) "Importing" else "Offline-first",
-                )
-                VodrInlineAction(
-                    label = "Open Generate",
-                    onClick = onOpenGenerate,
-                    enabled = documentCount > 0,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ContinueListeningCard(
     documentTitle: String,
     documentSourceUri: String,
@@ -373,74 +429,44 @@ private fun ContinueListeningCard(
     val spacing = VodrUiTheme.spacing
     val sizes = VodrUiTheme.sizes
     Card(
-        colors = VodrSurfaceStyles.accentCardColors(),
+        colors = VodrSurfaceStyles.subtleCardColors(),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .vodrAnimateContentSize()
                 .padding(spacing.md + spacing.xxs),
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm + spacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            DocumentArtworkCover(
+            VodrArtworkListRow(
                 title = documentTitle,
                 sourceUri = documentSourceUri,
                 mimeType = documentMimeType,
-                modifier = Modifier.size(
-                    width = sizes.continueArtworkWidth,
-                    height = sizes.continueArtworkHeight,
-                ),
+                subtitle = chapterTitle ?: "Resume your latest session",
+                supportingText = status,
+                artworkWidth = sizes.continueArtworkWidth,
+                artworkHeight = sizes.continueArtworkHeight,
+                titleTextStyle = MaterialTheme.typography.titleMedium,
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Continue listening",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    VodrChoiceChip(
-                        label = "Favorite",
-                        selected = isFavorite,
-                        onClick = onToggleFavorite,
-                        selectedIcon = Icons.Rounded.Star,
-                        unselectedIcon = Icons.Rounded.StarBorder,
-                    )
-                }
-                Text(
-                    text = documentTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                chapterTitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                PlaybackActionButton(
-                    icon = Icons.Rounded.PlayArrow,
-                    label = "Open player",
-                    contentDescription = "Open player for current session",
+                VodrInlineAction(
+                    label = "Resume",
                     onClick = onResumePlayback,
+                    icon = Icons.Rounded.PlayArrow,
+                )
+                VodrChoiceChip(
+                    label = "Favorite",
+                    selected = isFavorite,
+                    onClick = onToggleFavorite,
+                    selectedIcon = Icons.Rounded.Star,
+                    unselectedIcon = Icons.Rounded.StarBorder,
                 )
             }
         }
@@ -486,7 +512,7 @@ private fun RecentSessionsSection(
 @Composable
 private fun SessionShelfSection(
     title: String,
-    subtitle: String,
+    subtitle: String?,
     sessions: List<RecentListeningSessionItem>,
     emphasized: Boolean,
     onOpenSession: (String) -> Unit,
@@ -532,23 +558,11 @@ private fun SessionShelfSection(
                             progress = { session.progressFraction.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                            if (session.isFavorite) {
-                                VodrMetaChip(
-                                    label = "Favorite",
-                                    leadingIcon = Icons.Rounded.Star,
-                                )
-                            }
-                            session.personalizationProviderLabel?.let { label ->
-                                VodrMetaChip(
-                                    label = "AI: $label",
-                                )
-                            }
-                            session.transcriptionProviderLabel?.let { label ->
-                                VodrMetaChip(
-                                    label = "Transcript: $label",
-                                )
-                            }
+                        if (session.isFavorite) {
+                            VodrMetaChip(
+                                label = "Favorite",
+                                leadingIcon = Icons.Rounded.Star,
+                            )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                             VodrInlineAction(
@@ -588,9 +602,9 @@ private fun EmptyLibraryCard(
     onAddBook: () -> Unit,
 ) {
     VodrEmptyStateCard(
-        title = "No books yet",
-        message = "Tap Add Book to import a PDF or EPUB, then generate a spoken chapter queue.",
-        actionLabel = "Import your first book",
+        title = "Start your library",
+        message = "Import a PDF or EPUB to create your first listening session.",
+        actionLabel = "Import book",
         onAction = onAddBook,
     )
 }
@@ -598,6 +612,8 @@ private fun EmptyLibraryCard(
 @Composable
 private fun LibraryDocumentCardContent(
     document: ImportedDocument,
+    onOpenGenerate: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val spacing = VodrUiTheme.spacing
     val sizes = VodrUiTheme.sizes
@@ -622,6 +638,18 @@ private fun LibraryDocumentCardContent(
             )
             VodrMetaChip(
                 label = relativeImportedLabel(document.metadata.importedAtEpochMs),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            VodrInlineAction(
+                label = "Generate",
+                onClick = onOpenGenerate,
+                icon = Icons.Rounded.PlayArrow,
+            )
+            VodrInlineAction(
+                label = "Delete",
+                onClick = onDelete,
+                icon = Icons.Rounded.DeleteOutline,
             )
         }
     }
@@ -653,6 +681,16 @@ private fun toReadableSize(byteCount: Long): String {
 }
 
 private const val DAY_IN_MS: Long = 24L * 60L * 60L * 1_000L
+
+private fun releasePersistedReadPermission(
+    sourceUri: String,
+    releaseReadPermission: (android.net.Uri) -> Unit,
+) {
+    val uri = runCatching { android.net.Uri.parse(sourceUri) }.getOrNull() ?: return
+    runCatching {
+        releaseReadPermission(uri)
+    }
+}
 
 internal fun toImportDocumentRequest(
     sourceUri: String,

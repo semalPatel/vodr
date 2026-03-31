@@ -104,6 +104,10 @@ interface VodrPlayerController {
         sessionId: String,
         isFavorite: Boolean,
     )
+
+    fun removeDocumentSessions(sourceUri: String)
+
+    fun clearAll()
 }
 
 class InMemoryVodrPlayerController : VodrPlayerController {
@@ -272,6 +276,25 @@ class InMemoryVodrPlayerController : VodrPlayerController {
                 },
             )
         }
+    }
+
+    override fun removeDocumentSessions(sourceUri: String) {
+        mutableState.update { current ->
+            val shouldClearActiveDocument = current.activeDocument?.sourceUri == sourceUri
+            if (shouldClearActiveDocument) {
+                PlaybackState(
+                    sessionHistory = current.sessionHistory.filterNot { it.documentSourceUri == sourceUri },
+                )
+            } else {
+                current.copy(
+                    sessionHistory = current.sessionHistory.filterNot { it.documentSourceUri == sourceUri },
+                )
+            }
+        }
+    }
+
+    override fun clearAll() {
+        mutableState.value = PlaybackState()
     }
 
     private fun clampChapterIndex(
