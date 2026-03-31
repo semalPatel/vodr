@@ -36,6 +36,7 @@ import com.vodr.tts.NarrationResolution
 import com.vodr.tts.NarrationStyle
 import com.vodr.tts.NarratorVoicePack
 import dagger.hilt.android.AndroidEntryPoint
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
@@ -158,11 +159,11 @@ class VodrPlaybackService : MediaSessionService() {
         when (commandIntent?.action ?: ACTION_SYNC_QUEUE) {
             ACTION_SYNC_QUEUE -> syncQueueWithPlayer()
             ACTION_PLAY -> {
-                val snapshot = controller.snapshot()
+                val snapshot = requestPlaybackResume(controller.snapshot())
                 if (player.mediaItemCount > 0 && preparedSessionId == deriveSessionId(snapshot.activeDocument, snapshot.queue)) {
                     player.play()
                     syncControllerState()
-                    updateForegroundState()
+                    updateForegroundState(forceForeground = true)
                 } else {
                     syncQueueWithPlayer(forceForeground = true)
                 }
@@ -258,6 +259,17 @@ class VodrPlaybackService : MediaSessionService() {
         return START_STICKY
     }
 
+    private fun requestPlaybackResume(snapshot: PlaybackState): PlaybackState {
+        if (snapshot.queue.isEmpty() || snapshot.resumeWhenReady) {
+            return snapshot
+        }
+        return snapshot.copy(
+            playbackStatus = PlaybackStatus.PREPARING,
+            resumeWhenReady = true,
+            errorMessage = null,
+        ).also(controller::updateFromService)
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (!player.isPlaying && prepareJob?.isActive != true) {
             stopSelf()
@@ -300,7 +312,10 @@ class VodrPlaybackService : MediaSessionService() {
         }
 
         val shouldPlay = snapshot.resumeWhenReady
-        syncControllerState(errorMessage = null)
+        syncControllerState(
+            errorMessage = null,
+            resumeWhenReadyOverride = shouldPlay,
+        )
         updateNotification(forceForeground = forceForeground || shouldPlay)
         prepareJob = serviceScope.launch {
             if (!isVoiceReady) {
@@ -310,6 +325,7 @@ class VodrPlaybackService : MediaSessionService() {
                     } else {
                         null
                     },
+                    resumeWhenReadyOverride = shouldPlay,
                 )
                 updateForegroundState(forceForeground = forceForeground || shouldPlay)
                 return@launch
@@ -504,22 +520,64 @@ class VodrPlaybackService : MediaSessionService() {
                 style = plan.dominantStyle,
             ),
         )
+        val utterances = splitTextForTts(
+            text = chapter.text,
+            maxChars = resolveSafeTtsChunkMaxChars(TextToSpeech.getMaxSpeechInputLength()),
+        )
+        when {
+            utterances.isEmpty() -> throw IllegalStateException("Unable to render audio for ${chapter.title}.")
+            utterances.size == 1 -> synthesizeUtteranceToFile(
+                tts = tts,
+                text = utterances.single(),
+                targetFile = targetFile,
+                chapterTitle = chapter.title,
+            )
+
+            else -> {
+                val tempDirectory = File(
+                    targetFile.parentFile,
+                    "${targetFile.nameWithoutExtension}-${UUID.randomUUID()}",
+                ).apply { mkdirs() }
+                try {
+                    val partialFiles = utterances.mapIndexed { index, utterance ->
+                        File(tempDirectory, "part-$index.wav").also { partialFile ->
+                            synthesizeUtteranceToFile(
+                                tts = tts,
+                                text = utterance,
+                                targetFile = partialFile,
+                                chapterTitle = chapter.title,
+                            )
+                        }
+                    }
+                    concatenateWaveFiles(
+                        inputFiles = partialFiles,
+                        outputFile = targetFile,
+                    )
+                } finally {
+                    tempDirectory.deleteRecursively()
+                }
+            }
+        }
+    }
+
+    private suspend fun synthesizeUtteranceToFile(
+        tts: TextToSpeech,
+        text: String,
+        targetFile: File,
+        chapterTitle: String,
+    ) {
         val utteranceId = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<Result<Unit>>()
         synthResults[utteranceId] = deferred
-        val normalizedText = splitTextForTts(
-            text = chapter.text,
-            maxChars = TextToSpeech.getMaxSpeechInputLength(),
-        ).joinToString(separator = " ")
         val result = tts.synthesizeToFile(
-            normalizedText,
+            text,
             Bundle(),
             targetFile,
             utteranceId,
         )
         if (result != TextToSpeech.SUCCESS) {
             synthResults.remove(utteranceId)
-            throw IllegalStateException("Unable to render audio for ${chapter.title}.")
+            throw IllegalStateException("Unable to render audio for $chapterTitle.")
         }
         deferred.await().getOrThrow()
     }
@@ -615,6 +673,7 @@ class VodrPlaybackService : MediaSessionService() {
         }
 
         textToSpeech = TextToSpeech(applicationContext, { status ->
+            val shouldResume = controller.snapshot().resumeWhenReady
             val selectedLocale = if (status == TextToSpeech.SUCCESS) {
                 selectFirstSupportedTtsLocale(defaultLocale = Locale.getDefault()) { locale ->
                     textToSpeech?.setLanguage(locale) ?: TextToSpeech.ERROR
@@ -629,8 +688,9 @@ class VodrPlaybackService : MediaSessionService() {
                     selectedLocale == null -> "No supported text-to-speech voice is installed on this device."
                     else -> null
                 },
+                resumeWhenReadyOverride = shouldResume,
             )
-            if (isVoiceReady && controller.snapshot().queue.isNotEmpty() && controller.snapshot().resumeWhenReady) {
+            if (isVoiceReady && controller.snapshot().queue.isNotEmpty() && shouldResume) {
                 syncQueueWithPlayer(forceForeground = true)
             } else {
                 updateForegroundState()
@@ -810,6 +870,7 @@ class VodrPlaybackService : MediaSessionService() {
     private fun syncControllerState(
         errorMessage: String? = controller.snapshot().errorMessage,
         narrationResolution: NarrationResolution? = currentNarrationResolution,
+        resumeWhenReadyOverride: Boolean? = null,
     ) {
         val snapshot = controller.snapshot()
         val currentChapterIndex = when {
@@ -843,7 +904,7 @@ class VodrPlaybackService : MediaSessionService() {
                     player.isPlaying -> PlaybackStatus.PLAYING
                     else -> PlaybackStatus.PAUSED
                 },
-                resumeWhenReady = if (prepareJob?.isActive == true) {
+                resumeWhenReady = resumeWhenReadyOverride ?: if (prepareJob?.isActive == true) {
                     snapshot.resumeWhenReady
                 } else {
                     player.playWhenReady
@@ -1153,6 +1214,11 @@ internal fun splitTextForTts(
     return utterances
 }
 
+internal fun resolveSafeTtsChunkMaxChars(engineReportedMaxChars: Int): Int {
+    val reportedLimit = engineReportedMaxChars.takeIf { it > 0 } ?: SAFE_SYSTEM_TTS_CHUNK_MAX_CHARS
+    return minOf(reportedLimit, SAFE_SYSTEM_TTS_CHUNK_MAX_CHARS)
+}
+
 private fun splitSegmentForTts(
     segment: String,
     maxChars: Int,
@@ -1181,6 +1247,119 @@ private fun splitSegmentForTts(
         parts += currentPart
     }
     return parts
+}
+
+internal fun concatenateWaveFiles(
+    inputFiles: List<File>,
+    outputFile: File,
+) {
+    require(inputFiles.isNotEmpty()) { "At least one wave file is required." }
+    val parsedFiles = inputFiles.map(::parseWaveFile)
+    val formatChunk = parsedFiles.first().formatChunk
+    parsedFiles.drop(1).forEach { parsed ->
+        require(parsed.formatChunk.contentEquals(formatChunk)) {
+            "All synthesized wave files must share the same format."
+        }
+    }
+    val combinedAudioData = ByteArrayOutputStream(parsedFiles.sumOf { it.audioData.size }).apply {
+        parsedFiles.forEach { parsed -> write(parsed.audioData) }
+    }.toByteArray()
+    outputFile.parentFile?.mkdirs()
+    outputFile.writeBytes(
+        buildWaveFileBytes(
+            formatChunk = formatChunk,
+            audioData = combinedAudioData,
+        ),
+    )
+}
+
+private data class ParsedWaveFile(
+    val formatChunk: ByteArray,
+    val audioData: ByteArray,
+)
+
+private fun parseWaveFile(file: File): ParsedWaveFile {
+    val bytes = file.readBytes()
+    require(bytes.size >= 12) { "Wave file is too small: ${file.name}" }
+    require(String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF") {
+        "Unsupported audio container for ${file.name}"
+    }
+    require(String(bytes, 8, 4, Charsets.US_ASCII) == "WAVE") {
+        "Unsupported wave encoding for ${file.name}"
+    }
+    var offset = 12
+    var formatChunk: ByteArray? = null
+    var audioData: ByteArray? = null
+    while (offset + 8 <= bytes.size) {
+        val chunkId = String(bytes, offset, 4, Charsets.US_ASCII)
+        val chunkSize = bytes.readLittleEndianInt(offset + 4)
+        val chunkStart = offset + 8
+        val chunkEnd = chunkStart + chunkSize
+        require(chunkSize >= 0 && chunkEnd <= bytes.size) {
+            "Corrupt wave chunk '$chunkId' in ${file.name}"
+        }
+        val chunkData = bytes.copyOfRange(chunkStart, chunkEnd)
+        when (chunkId) {
+            "fmt " -> formatChunk = chunkData
+            "data" -> audioData = chunkData
+        }
+        offset = chunkEnd + (chunkSize % 2)
+    }
+    return ParsedWaveFile(
+        formatChunk = requireNotNull(formatChunk) { "Wave format chunk missing in ${file.name}" },
+        audioData = requireNotNull(audioData) { "Wave data chunk missing in ${file.name}" },
+    )
+}
+
+private fun buildWaveFileBytes(
+    formatChunk: ByteArray,
+    audioData: ByteArray,
+): ByteArray {
+    val output = ByteArrayOutputStream(
+        12 + 8 + formatChunk.size + (formatChunk.size % 2) + 8 + audioData.size + (audioData.size % 2),
+    )
+    output.writeAscii("RIFF")
+    output.writeLittleEndianInt(
+        4 + 8 + formatChunk.size + (formatChunk.size % 2) + 8 + audioData.size + (audioData.size % 2),
+    )
+    output.writeAscii("WAVE")
+    output.writeWaveChunk(id = "fmt ", data = formatChunk)
+    output.writeWaveChunk(id = "data", data = audioData)
+    return output.toByteArray()
+}
+
+private fun ByteArray.readLittleEndianInt(offset: Int): Int {
+    return (this[offset].toInt() and 0xFF) or
+        ((this[offset + 1].toInt() and 0xFF) shl 8) or
+        ((this[offset + 2].toInt() and 0xFF) shl 16) or
+        ((this[offset + 3].toInt() and 0xFF) shl 24)
+}
+
+private fun ByteArrayOutputStream.writeAscii(value: String) {
+    write(value.toByteArray(Charsets.US_ASCII))
+}
+
+private fun ByteArrayOutputStream.writeLittleEndianInt(value: Int) {
+    write(
+        byteArrayOf(
+            (value and 0xFF).toByte(),
+            ((value shr 8) and 0xFF).toByte(),
+            ((value shr 16) and 0xFF).toByte(),
+            ((value shr 24) and 0xFF).toByte(),
+        ),
+    )
+}
+
+private fun ByteArrayOutputStream.writeWaveChunk(
+    id: String,
+    data: ByteArray,
+) {
+    writeAscii(id)
+    writeLittleEndianInt(data.size)
+    write(data)
+    if (data.size % 2 == 1) {
+        write(0)
+    }
 }
 
 internal fun Int.isSupportedTtsLanguageResult(): Boolean {
@@ -1237,3 +1416,4 @@ private fun sha256(value: String): String {
 private val SENTENCE_BOUNDARY_REGEX = Regex("(?<=[.!?])\\s+")
 private val WHITESPACE_REGEX = Regex("\\s+")
 private const val GOOGLE_TTS_PACKAGE_NAME: String = "com.google.android.tts"
+private const val SAFE_SYSTEM_TTS_CHUNK_MAX_CHARS: Int = 3_000
