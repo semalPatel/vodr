@@ -4,6 +4,7 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VodrPlaybackServiceTest {
@@ -50,5 +51,40 @@ class VodrPlaybackServiceTest {
         assertEquals(true, TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE.isSupportedTtsLanguageResult())
         assertEquals(false, TextToSpeech.LANG_MISSING_DATA.isSupportedTtsLanguageResult())
         assertEquals(false, TextToSpeech.LANG_NOT_SUPPORTED.isSupportedTtsLanguageResult())
+    }
+
+    @Test
+    fun resolvePreferredTtsEnginePackageName_usesDefaultWhenInstalled() {
+        val engine = resolvePreferredTtsEnginePackageName(
+            defaultEnginePackage = "com.example.tts",
+            availableEngines = listOf("com.example.tts", "com.google.android.tts"),
+        )
+
+        assertEquals("com.example.tts", engine)
+    }
+
+    @Test
+    fun resolvePreferredTtsEnginePackageName_fallsBackToGoogleTtsWhenDefaultMissing() {
+        val engine = resolvePreferredTtsEnginePackageName(
+            defaultEnginePackage = null,
+            availableEngines = listOf("com.google.android.tts", "com.example.tts"),
+        )
+
+        assertEquals("com.google.android.tts", engine)
+    }
+
+    @Test
+    fun splitTextForTts_breaksLongInputIntoBoundedUtterances() {
+        val chunks = splitTextForTts(
+            text = "One short sentence. This is a much longer sentence that should be split into multiple pieces when needed for playback.",
+            maxChars = 24,
+        )
+
+        assertTrue(chunks.isNotEmpty())
+        assertTrue(chunks.all { it.length <= 24 })
+        assertEquals(
+            "One short sentence. This is a much longer sentence that should be split into multiple pieces when needed for playback.",
+            chunks.joinToString(" "),
+        )
     }
 }

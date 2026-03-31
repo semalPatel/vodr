@@ -30,7 +30,10 @@ fun SettingsScreen(
         title = "Settings",
         modifier = modifier,
     ) { contentPadding ->
-        VodrScreenColumn(contentPadding = contentPadding) {
+        VodrScreenColumn(
+            contentPadding = contentPadding,
+            scrollable = true,
+        ) {
             VodrSectionHeader(
                 title = "Voice",
             )

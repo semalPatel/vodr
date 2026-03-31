@@ -2,6 +2,7 @@ package com.vodr.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.provider.Settings
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -33,6 +34,8 @@ class VodrPlaybackService : MediaSessionService() {
     private var activeUtteranceId: String? = null
     private var activeChapterIndex: Int = -1
     private var activeStartPositionMs: Long = 0L
+    private var activeChapterChunks: List<String> = emptyList()
+    private var activeChunkIndex: Int = 0
     private val progressHandler = android.os.Handler(Looper.getMainLooper())
     private val progressUpdater = object : Runnable {
         override fun run() {
@@ -235,7 +238,17 @@ class VodrPlaybackService : MediaSessionService() {
     }
 
     private fun initializeTextToSpeech() {
-        textToSpeech = TextToSpeech(applicationContext) { status ->
+        val enginePackageName = resolvePreferredTtsEnginePackageName(
+            defaultEnginePackage = readDefaultTtsEnginePackageName(),
+            availableEngines = availableTtsEnginePackageNames(),
+        )
+        if (enginePackageName == null) {
+            isVoiceReady = false
+            syncControllerState(errorMessage = "No text-to-speech engine is installed on this device.")
+            return
+        }
+
+        textToSpeech = TextToSpeech(applicationContext, { status ->
             val selectedLocale = if (status == TextToSpeech.SUCCESS) {
                 selectFirstSupportedTtsLocale(defaultLocale = Locale.getDefault()) { locale ->
                     textToSpeech?.setLanguage(locale) ?: TextToSpeech.ERROR
@@ -254,7 +267,7 @@ class VodrPlaybackService : MediaSessionService() {
             if (isVoiceReady && player.isPlaying) {
                 syncTtsWithPlayer(force = true)
             }
-        }.apply {
+        }, enginePackageName).apply {
             setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
@@ -269,7 +282,15 @@ class VodrPlaybackService : MediaSessionService() {
                         if (utteranceId != activeUtteranceId) {
                             return
                         }
+                        if (activeChunkIndex < activeChapterChunks.lastIndex) {
+                            activeChunkIndex += 1
+                            speakActiveChunk()
+                            syncControllerState()
+                            return
+                        }
                         activeUtteranceId = null
+                        activeChapterChunks = emptyList()
+                        activeChunkIndex = 0
                         if (player.hasNextMediaItem()) {
                             player.seekToNextMediaItem()
                             if (!player.isPlaying) {
@@ -281,12 +302,15 @@ class VodrPlaybackService : MediaSessionService() {
                         syncControllerState()
                     }
 
+                    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
                     @Deprecated("Use onError(String?, Int) when migrating to newer TTS callbacks.")
                     override fun onError(utteranceId: String?) {
                         if (utteranceId != activeUtteranceId) {
                             return
                         }
                         activeUtteranceId = null
+                        activeChapterChunks = emptyList()
+                        activeChunkIndex = 0
                         player.pause()
                         syncControllerState(errorMessage = "Unable to speak the current chapter.")
                     }
@@ -294,6 +318,8 @@ class VodrPlaybackService : MediaSessionService() {
                     override fun onStop(utteranceId: String?, interrupted: Boolean) {
                         if (utteranceId == activeUtteranceId) {
                             activeUtteranceId = null
+                            activeChapterChunks = emptyList()
+                            activeChunkIndex = 0
                         }
                     }
                 },
@@ -335,27 +361,71 @@ class VodrPlaybackService : MediaSessionService() {
         }
 
         stopCurrentUtterance()
-        activeUtteranceId = UUID.randomUUID().toString()
         activeChapterIndex = chapterIndex
         activeStartPositionMs = positionMs
+        activeChapterChunks = splitTextForTts(
+            text = textToSpeak,
+            maxChars = TextToSpeech.getMaxSpeechInputLength(),
+        )
+        activeChunkIndex = 0
+        if (activeChapterChunks.isEmpty()) {
+            if (player.hasNextMediaItem()) {
+                player.seekToNextMediaItem()
+            } else {
+                player.pause()
+            }
+            return
+        }
+        speakActiveChunk()
+    }
+
+    private fun stopCurrentUtterance() {
+        activeUtteranceId = null
+        activeChapterChunks = emptyList()
+        activeChunkIndex = 0
+        textToSpeech?.stop()
+        stopProgressUpdates()
+    }
+
+    private fun speakActiveChunk() {
+        val chunk = activeChapterChunks.getOrNull(activeChunkIndex)
+        if (chunk.isNullOrBlank()) {
+            player.pause()
+            syncControllerState(errorMessage = "Unable to start narration.")
+            return
+        }
+        activeUtteranceId = UUID.randomUUID().toString()
+        activeStartPositionMs = player.currentPosition.coerceAtLeast(0L)
         textToSpeech?.setSpeechRate(player.playbackParameters.speed)
         val result = textToSpeech?.speak(
-            textToSpeak,
+            chunk,
             TextToSpeech.QUEUE_FLUSH,
             null,
             activeUtteranceId,
         ) ?: TextToSpeech.ERROR
         if (result != TextToSpeech.SUCCESS) {
             activeUtteranceId = null
+            activeChapterChunks = emptyList()
+            activeChunkIndex = 0
             player.pause()
             syncControllerState(errorMessage = "Unable to start narration.")
         }
     }
 
-    private fun stopCurrentUtterance() {
-        activeUtteranceId = null
-        textToSpeech?.stop()
-        stopProgressUpdates()
+    private fun availableTtsEnginePackageNames(): List<String> {
+        return packageManager.queryIntentServices(
+            Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE),
+            0,
+        ).mapNotNull { resolveInfo ->
+            resolveInfo.serviceInfo?.packageName
+        }.distinct()
+    }
+
+    private fun readDefaultTtsEnginePackageName(): String? {
+        return Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.TTS_DEFAULT_SYNTH,
+        )?.takeIf { it.isNotBlank() }
     }
 
     private fun syncControllerState(errorMessage: String? = controller.snapshot().errorMessage) {
@@ -454,12 +524,103 @@ internal fun selectFirstSupportedTtsLocale(
 private fun preferredTtsLocales(defaultLocale: Locale): List<Locale> {
     return buildList {
         add(defaultLocale)
+        defaultLocale.language.takeIf { it.isNotBlank() }?.let(Locale::forLanguageTag)?.let(::add)
         if (defaultLocale != Locale.US) {
             add(Locale.US)
         }
+        if (defaultLocale != Locale.ENGLISH) {
+            add(Locale.ENGLISH)
+        }
+    }.distinct()
+}
+
+internal fun resolvePreferredTtsEnginePackageName(
+    defaultEnginePackage: String?,
+    availableEngines: List<String>,
+): String? {
+    val sanitizedDefault = defaultEnginePackage?.trim()?.takeIf { it.isNotBlank() }
+    return when {
+        sanitizedDefault != null && sanitizedDefault in availableEngines -> sanitizedDefault
+        GOOGLE_TTS_PACKAGE_NAME in availableEngines -> GOOGLE_TTS_PACKAGE_NAME
+        else -> availableEngines.firstOrNull()
     }
+}
+
+internal fun splitTextForTts(
+    text: String,
+    maxChars: Int,
+): List<String> {
+    val normalizedText = text.replace(WHITESPACE_REGEX, " ").trim()
+    if (normalizedText.isBlank()) {
+        return emptyList()
+    }
+    val utterances = mutableListOf<String>()
+    var currentUtterance = ""
+    val segments = normalizedText.split(SENTENCE_BOUNDARY_REGEX)
+        .map(String::trim)
+        .filter(String::isNotBlank)
+
+    segments.forEach { segment ->
+        val pieces = if (segment.length <= maxChars) {
+            listOf(segment)
+        } else {
+            splitSegmentForTts(segment = segment, maxChars = maxChars)
+        }
+        pieces.forEach { piece ->
+            val candidate = if (currentUtterance.isBlank()) {
+                piece
+            } else {
+                "$currentUtterance $piece"
+            }
+            if (candidate.length <= maxChars) {
+                currentUtterance = candidate
+            } else {
+                if (currentUtterance.isNotBlank()) {
+                    utterances += currentUtterance
+                }
+                currentUtterance = piece
+            }
+        }
+    }
+    if (currentUtterance.isNotBlank()) {
+        utterances += currentUtterance
+    }
+    return utterances
+}
+
+private fun splitSegmentForTts(
+    segment: String,
+    maxChars: Int,
+): List<String> {
+    val parts = mutableListOf<String>()
+    var currentPart = ""
+    segment.split(" ").filter(String::isNotBlank).forEach { word ->
+        when {
+            word.length > maxChars -> {
+                if (currentPart.isNotBlank()) {
+                    parts += currentPart
+                    currentPart = ""
+                }
+                parts += word.chunked(maxChars)
+            }
+            currentPart.isBlank() -> currentPart = word
+            currentPart.length + 1 + word.length <= maxChars -> currentPart += " $word"
+            else -> {
+                parts += currentPart
+                currentPart = word
+            }
+        }
+    }
+    if (currentPart.isNotBlank()) {
+        parts += currentPart
+    }
+    return parts
 }
 
 internal fun Int.isSupportedTtsLanguageResult(): Boolean {
     return this >= TextToSpeech.LANG_AVAILABLE
 }
+
+private val SENTENCE_BOUNDARY_REGEX = Regex("(?<=[.!?])\\s+")
+private val WHITESPACE_REGEX = Regex("\\s+")
+private const val GOOGLE_TTS_PACKAGE_NAME: String = "com.google.android.tts"

@@ -30,6 +30,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,7 +61,6 @@ import com.vodr.ui.VodrMessageTone
 import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.VodrScreenColumn
 import com.vodr.ui.VodrScreenScaffold
-import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrMotionSpecs
 import com.vodr.ui.theme.VodrSurfaceStyles
 import com.vodr.ui.theme.VodrUiTheme
@@ -115,15 +115,43 @@ fun PlayerScreen(
     val isPlaying = state.playbackStatus == PlaybackStatus.PLAYING ||
         state.playbackStatus == PlaybackStatus.PREPARING
     var isChapterMenuExpanded by remember { mutableStateOf(false) }
+    var showSessionsSheet by remember { mutableStateOf(false) }
     val currentSessionId = state.sessionHistory.firstOrNull()?.sessionId
+
+    if (showSessionsSheet && state.sessionHistory.isNotEmpty()) {
+        ModalBottomSheet(
+            onDismissRequest = { showSessionsSheet = false },
+        ) {
+            ListeningSessionsCard(
+                sessions = state.sessionHistory,
+                currentSessionId = currentSessionId,
+                onRestoreSession = {
+                    showSessionsSheet = false
+                    viewModel.restoreSession(it)
+                },
+                onRemoveSession = viewModel::removeSession,
+                onSetFavorite = viewModel::setSessionFavorite,
+            )
+        }
+    }
 
     VodrScreenScaffold(
         title = "Player",
         modifier = modifier,
+        actions = {
+            if (state.sessionHistory.isNotEmpty()) {
+                VodrInlineAction(
+                    label = "Sessions",
+                    onClick = { showSessionsSheet = true },
+                    icon = Icons.AutoMirrored.Rounded.MenuBook,
+                )
+            }
+        },
     ) { contentPadding ->
         VodrScreenColumn(
             contentPadding = contentPadding,
             fillMaxSize = true,
+            scrollable = true,
         ) {
             PlayerHeroCard(
                 documentTitle = state.activeDocument?.title,
@@ -139,15 +167,6 @@ fun PlayerScreen(
                 playbackStatusLabel = state.playbackStatus.toReadableLabel(),
                 runtimeMetadata = state.runtimeMetadata,
             )
-            if (state.sessionHistory.isNotEmpty()) {
-                ListeningSessionsCard(
-                    sessions = state.sessionHistory,
-                    currentSessionId = currentSessionId,
-                    onRestoreSession = viewModel::restoreSession,
-                    onRemoveSession = viewModel::removeSession,
-                    onSetFavorite = viewModel::setSessionFavorite,
-                )
-            }
             Card(
                 colors = VodrSurfaceStyles.subtleCardColors(),
             ) {
@@ -200,35 +219,6 @@ fun PlayerScreen(
                     }
                 }
             }
-            VodrCrossfade(
-                targetState = currentChapter,
-                label = "player-chapter-preview",
-            ) { chapter ->
-                chapter?.let {
-                    Card(
-                        colors = VodrSurfaceStyles.subtleCardColors(),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .vodrAnimateContentSize()
-                                .padding(spacing.md + spacing.xxs),
-                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                        ) {
-                            VodrSectionHeader(
-                                title = "Chapter preview",
-                            )
-                            Text(
-                                text = it.text.take(260),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 6,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 PlaybackActionButton(
                     icon = Icons.Rounded.SkipPrevious,
@@ -246,7 +236,7 @@ fun PlayerScreen(
                         "Start narration"
                     },
                     onClick = viewModel::togglePlayback,
-                    enabled = currentChapter != null && state.isVoiceReady,
+                    enabled = currentChapter != null,
                 )
                 PlaybackActionButton(
                     icon = Icons.Rounded.SkipNext,
@@ -544,11 +534,6 @@ private fun PlayerHeroCard(
                     }
                 }
             }
-            Text(
-                text = "Now Playing",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
             documentTitle?.let {
                 Text(
                     text = it,
@@ -603,20 +588,6 @@ private fun PlayerHeroCard(
                             label = "Transcript: $label",
                         )
                     }
-                }
-                runtimeMetadata.personalizationDetail?.let { detail ->
-                    Text(
-                        text = detail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                runtimeMetadata.transcriptionDetail?.let { detail ->
-                    Text(
-                        text = detail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }

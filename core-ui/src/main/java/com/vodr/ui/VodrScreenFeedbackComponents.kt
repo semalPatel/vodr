@@ -1,5 +1,7 @@
 package com.vodr.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -49,6 +51,7 @@ fun VodrScreenColumn(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
     fillMaxSize: Boolean = false,
+    scrollable: Boolean = false,
     horizontalPadding: Dp? = null,
     verticalSpacing: Dp? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -56,16 +59,23 @@ fun VodrScreenColumn(
     val spacing = VodrUiTheme.spacing
     val resolvedHorizontalPadding = horizontalPadding ?: spacing.xl
     val resolvedVerticalSpacing = verticalSpacing ?: spacing.md
+    val scrollModifier = if (scrollable) {
+        Modifier.verticalScroll(rememberScrollState())
+    } else {
+        Modifier
+    }
     Surface(modifier = modifier.padding(contentPadding)) {
         Column(
             modifier = if (fillMaxSize) {
                 Modifier
                     .fillMaxSize()
                     .padding(horizontal = resolvedHorizontalPadding)
+                    .then(scrollModifier)
             } else {
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = resolvedHorizontalPadding)
+                    .then(scrollModifier)
             },
             verticalArrangement = Arrangement.spacedBy(resolvedVerticalSpacing),
             content = content,
