@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -105,6 +107,11 @@ fun LibraryScreen(
         compareByDescending<RecentListeningSessionItem> { it.isFavorite }
             .thenByDescending { it.updatedAtEpochMs },
     )
+        .filterNot { session ->
+            continueListeningDocumentSourceUri != null &&
+                session.documentSourceUri == continueListeningDocumentSourceUri
+        }
+        .distinctBy(RecentListeningSessionItem::documentSourceUri)
     val showEmptyLibraryState = state.documents.isEmpty() &&
         displayedSessions.isEmpty() &&
         !hasContinueListening
@@ -315,18 +322,30 @@ fun LibraryScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                expanded = true,
-                onClick = { showAddSheet = true },
-                icon = {
+            if (showEmptyLibraryState) {
+                ExtendedFloatingActionButton(
+                    expanded = true,
+                    onClick = { showAddSheet = true },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = null,
+                        )
+                    },
+                    text = { Text(text = "Add Book") },
+                    modifier = Modifier.semantics { contentDescription = "Add a new book" },
+                )
+            } else {
+                FloatingActionButton(
+                    onClick = { showAddSheet = true },
+                    modifier = Modifier.semantics { contentDescription = "Add a new book" },
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.Add,
                         contentDescription = null,
                     )
-                },
-                text = { Text(text = "Add Book") },
-                modifier = Modifier.semantics { contentDescription = "Add a new book" },
-            )
+                }
+            }
         },
     ) { contentPadding ->
         VodrScreenColumn(
@@ -462,9 +481,9 @@ private fun ContinueListeningCard(
                 transcriptionProviderLabel = null,
                 narrationProviderLabel = narrationProviderLabel,
             )
-            Row(
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
                 VodrInlineAction(
                     label = "Resume",
@@ -579,7 +598,10 @@ private fun SessionShelfSection(
                             transcriptionProviderLabel = session.transcriptionProviderLabel,
                             narrationProviderLabel = session.narrationProviderLabel,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                        ) {
                             VodrInlineAction(
                                 label = "Open",
                                 onClick = { onOpenSession(session.sessionId) },
@@ -647,7 +669,10 @@ private fun LibraryDocumentCardContent(
             artworkWidth = sizes.documentArtworkWidth,
             artworkHeight = sizes.documentArtworkHeight,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
             VodrMetaChip(
                 label = if (document.metadata.mimeType.contains("epub")) "EPUB" else "PDF",
             )
@@ -655,7 +680,10 @@ private fun LibraryDocumentCardContent(
                 label = relativeImportedLabel(document.metadata.importedAtEpochMs),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
             VodrInlineAction(
                 label = "Generate",
                 onClick = onOpenGenerate,

@@ -10,7 +10,8 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:label="Vodr"
-        android:roundIcon="@mipmap/ic_launcher_round">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.Vodr">
         <activity
             android:name=".MainActivity"
             android:exported="true">
