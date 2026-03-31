@@ -7,8 +7,10 @@
     <application
         android:name=".VodrApplication"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
-        android:label="Vodr">
+        android:label="Vodr"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <activity
             android:name=".MainActivity"
             android:exported="true">
