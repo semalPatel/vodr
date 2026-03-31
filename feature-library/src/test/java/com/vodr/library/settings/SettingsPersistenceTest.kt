@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.vodr.ai.PersonalizationProviderType
 import com.vodr.data.db.VodrDatabase
 import com.vodr.data.db.entity.UserSettingsEntity
+import com.vodr.tts.VoicePackStore
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -29,7 +30,10 @@ class SettingsPersistenceTest {
         )
             .allowMainThreadQueries()
             .build()
-        repository = SettingsRepository(database.userSettingsDao())
+        repository = SettingsRepository(
+            userSettingsDao = database.userSettingsDao(),
+            voicePackStore = VoicePackStore(ApplicationProvider.getApplicationContext()),
+        )
     }
 
     @After

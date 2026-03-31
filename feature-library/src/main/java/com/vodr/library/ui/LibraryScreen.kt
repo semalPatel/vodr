@@ -58,6 +58,7 @@ import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.VodrMetaChip
 import com.vodr.ui.VodrMessageText
 import com.vodr.ui.VodrMessageTone
+import com.vodr.ui.VodrRuntimeProviderStrip
 import com.vodr.ui.VodrScreenColumn
 import com.vodr.ui.VodrScreenScaffold
 import com.vodr.ui.VodrSectionHeader
@@ -78,6 +79,7 @@ fun LibraryScreen(
     continueListeningProgress: Float = 0f,
     continueListeningStatus: String? = null,
     continueListeningIsFavorite: Boolean = false,
+    continueListeningNarrationProviderLabel: String? = null,
     recentSessions: List<RecentListeningSessionItem> = emptyList(),
     onOpenGenerate: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -346,6 +348,7 @@ fun LibraryScreen(
                     progress = continueListeningProgress,
                     status = continueListeningStatus ?: "Ready",
                     isFavorite = continueListeningIsFavorite,
+                    narrationProviderLabel = continueListeningNarrationProviderLabel,
                     onResumePlayback = onResumePlayback,
                     onToggleFavorite = onToggleContinueFavorite,
                 )
@@ -412,6 +415,7 @@ data class RecentListeningSessionItem(
     val isFavorite: Boolean = false,
     val personalizationProviderLabel: String? = null,
     val transcriptionProviderLabel: String? = null,
+    val narrationProviderLabel: String? = null,
 )
 
 @Composable
@@ -423,6 +427,7 @@ private fun ContinueListeningCard(
     progress: Float,
     status: String,
     isFavorite: Boolean,
+    narrationProviderLabel: String?,
     onResumePlayback: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
@@ -451,6 +456,11 @@ private fun ContinueListeningCard(
             androidx.compose.material3.LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(),
+            )
+            VodrRuntimeProviderStrip(
+                personalizationProviderLabel = null,
+                transcriptionProviderLabel = null,
+                narrationProviderLabel = narrationProviderLabel,
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
@@ -564,6 +574,11 @@ private fun SessionShelfSection(
                                 leadingIcon = Icons.Rounded.Star,
                             )
                         }
+                        VodrRuntimeProviderStrip(
+                            personalizationProviderLabel = session.personalizationProviderLabel,
+                            transcriptionProviderLabel = session.transcriptionProviderLabel,
+                            narrationProviderLabel = session.narrationProviderLabel,
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                             VodrInlineAction(
                                 label = "Open",

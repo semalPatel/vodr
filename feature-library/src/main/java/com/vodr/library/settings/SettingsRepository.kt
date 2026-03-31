@@ -5,6 +5,8 @@ import com.vodr.ai.PersonalizationPreferences
 import com.vodr.ai.PersonalizationProviderType
 import com.vodr.data.db.dao.UserSettingsDao
 import com.vodr.data.db.entity.UserSettingsEntity
+import com.vodr.tts.NarratorVoicePack
+import com.vodr.tts.VoicePackStore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +22,7 @@ data class GenerationRequestPayload(
 @Singleton
 class SettingsRepository @Inject constructor(
     private val userSettingsDao: UserSettingsDao,
+    private val voicePackStore: VoicePackStore,
 ) {
     suspend fun load(): UserSettingsEntity {
         return withContext(Dispatchers.IO) {
@@ -31,6 +34,30 @@ class SettingsRepository @Inject constructor(
         return withContext(Dispatchers.IO) {
             userSettingsDao.upsert(settings)
             settings
+        }
+    }
+
+    suspend fun loadInstalledVoicePacks(): List<NarratorVoicePack> {
+        return withContext(Dispatchers.IO) {
+            voicePackStore.listInstalled()
+        }
+    }
+
+    suspend fun installStarterVoicePack(): NarratorVoicePack {
+        return withContext(Dispatchers.IO) {
+            voicePackStore.installStarterPack()
+        }
+    }
+
+    suspend fun installVoicePackFromUrl(url: String): NarratorVoicePack {
+        return withContext(Dispatchers.IO) {
+            voicePackStore.installFromUrl(url)
+        }
+    }
+
+    suspend fun removeVoicePack(voicePackId: String) {
+        withContext(Dispatchers.IO) {
+            voicePackStore.remove(voicePackId)
         }
     }
 }

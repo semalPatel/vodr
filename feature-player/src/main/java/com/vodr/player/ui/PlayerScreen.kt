@@ -67,6 +67,7 @@ import com.vodr.ui.theme.VodrUiTheme
 import com.vodr.ui.theme.vodrAnimateContentSize
 import com.vodr.ui.VodrMetaChip
 import com.vodr.ui.VodrSectionHeader
+import com.vodr.ui.VodrRuntimeProviderStrip
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -373,6 +374,11 @@ private fun ListeningSessionsCard(
                                 progress = { session.progressFraction.coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            VodrRuntimeProviderStrip(
+                                personalizationProviderLabel = session.personalizationProviderLabel,
+                                transcriptionProviderLabel = session.transcriptionProviderLabel,
+                                narrationProviderLabel = session.narrationProviderLabel,
+                            )
                             Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                                 if (session.isFavorite) {
                                     VodrMetaChip(
@@ -574,22 +580,11 @@ private fun PlayerHeroCard(
                     label = playbackStatusLabel,
                 )
             }
-            if (runtimeMetadata?.personalizationProviderLabel != null ||
-                runtimeMetadata?.transcriptionProviderLabel != null
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    runtimeMetadata.personalizationProviderLabel?.let { label ->
-                        VodrMetaChip(
-                            label = "AI: $label",
-                        )
-                    }
-                    runtimeMetadata.transcriptionProviderLabel?.let { label ->
-                        VodrMetaChip(
-                            label = "Transcript: $label",
-                        )
-                    }
-                }
-            }
+            VodrRuntimeProviderStrip(
+                personalizationProviderLabel = runtimeMetadata?.personalizationProviderLabel,
+                transcriptionProviderLabel = runtimeMetadata?.transcriptionProviderLabel,
+                narrationProviderLabel = runtimeMetadata?.narrationProviderLabel,
+            )
         }
     }
 }
