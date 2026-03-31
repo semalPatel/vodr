@@ -60,10 +60,12 @@ import com.vodr.ui.VodrInlineAction
 import com.vodr.ui.VodrMetaChip
 import com.vodr.ui.VodrMessageText
 import com.vodr.ui.VodrMessageTone
+import com.vodr.ui.PlaybackActionButton
 import com.vodr.ui.VodrRuntimeProviderStrip
 import com.vodr.ui.VodrScreenColumn
 import com.vodr.ui.VodrScreenScaffold
 import com.vodr.ui.VodrSectionHeader
+import com.vodr.ui.VodrTopBarIconAction
 import com.vodr.ui.theme.VodrAnimatedVisibility
 import com.vodr.ui.theme.VodrCrossfade
 import com.vodr.ui.theme.VodrSurfaceStyles
@@ -309,14 +311,14 @@ fun LibraryScreen(
         modifier = modifier,
         actions = {
             if (hasSavedLibraryData) {
-                VodrInlineAction(
-                    label = "Clear",
+                VodrTopBarIconAction(
+                    contentDescription = "Clear library",
                     onClick = { showClearLibraryDialog = true },
                     icon = Icons.Rounded.DeleteOutline,
                 )
             }
-            VodrInlineAction(
-                label = "Settings",
+            VodrTopBarIconAction(
+                contentDescription = "Open settings",
                 onClick = onOpenSettings,
                 icon = Icons.Rounded.Settings,
             )
@@ -359,6 +361,14 @@ fun LibraryScreen(
                 )
             }
             if (hasContinueListening) {
+                VodrSectionHeader(
+                    title = "Continue listening",
+                    subtitle = if (state.documents.isEmpty() && displayedSessions.isEmpty()) {
+                        "Your active book is ready whenever you are."
+                    } else {
+                        null
+                    },
+                )
                 ContinueListeningCard(
                     documentTitle = continueListeningDocumentTitle!!,
                     documentSourceUri = continueListeningDocumentSourceUri!!,
@@ -459,7 +469,7 @@ private fun ContinueListeningCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .vodrAnimateContentSize()
-                .padding(spacing.md + spacing.xxs),
+                .padding(spacing.md),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             VodrArtworkListRow(
@@ -468,8 +478,8 @@ private fun ContinueListeningCard(
                 mimeType = documentMimeType,
                 subtitle = chapterTitle ?: "Resume your latest session",
                 supportingText = status,
-                artworkWidth = sizes.continueArtworkWidth,
-                artworkHeight = sizes.continueArtworkHeight,
+                artworkWidth = sizes.sessionArtworkWidth,
+                artworkHeight = sizes.sessionArtworkHeight,
                 titleTextStyle = MaterialTheme.typography.titleMedium,
             )
             androidx.compose.material3.LinearProgressIndicator(
@@ -485,10 +495,11 @@ private fun ContinueListeningCard(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
-                VodrInlineAction(
-                    label = "Resume",
+                PlaybackActionButton(
                     onClick = onResumePlayback,
                     icon = Icons.Rounded.PlayArrow,
+                    label = "Resume",
+                    contentDescription = "Resume audiobook playback",
                 )
                 VodrChoiceChip(
                     label = "Favorite",
